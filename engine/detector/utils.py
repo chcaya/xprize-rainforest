@@ -6,7 +6,7 @@ from shapely.geometry import Polygon
 from rastervision.core.data import Scene
 
 
-def display_train_valid_test_aoi(train_scene: Scene, valid_scene: Scene, test_scene: Scene):
+def display_train_valid_test_aoi(train_scene: Scene, valid_scene: Scene, test_scene: Scene, show_image: bool, output_file: str or None):
     img = train_scene.raster_source[:, :]
 
     H, W = img.shape[:2]
@@ -33,4 +33,10 @@ def display_train_valid_test_aoi(train_scene: Scene, valid_scene: Scene, test_sc
         p = mpatches.Polygon(np.array(aoi.exterior.coords), color='red', linewidth=2, fill=False)
         ax.add_patch(p)
 
-    plt.show()
+    if output_file:
+        fig.canvas.draw()
+        plt.imsave(output_file, np.array(fig.canvas.renderer.buffer_rgba()))
+    if show_image:
+        plt.show()
+    else:
+        plt.close(fig)
