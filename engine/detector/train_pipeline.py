@@ -1,16 +1,15 @@
-from rastervision.core.data import make_od_scene
-from pathlib import Path
-from rastervision.core.data import ClassConfig
+import os
+from rastervision.core.data import make_od_scene, ClassConfig
 
 from engine.detector.utils import display_train_valid_test_aoi
 
 
 def train_pipeline(config):
-    rgb_path = str(Path.joinpath(Path(config["DATA_ROOT"]), Path(config["TIF_NAME"])))
-    trees_path = str(Path.joinpath(Path(config["DATA_ROOT"]), Path(config["BBOX_TREES_NAME"])))
-    train_box_path = str(Path.joinpath(Path(config["DATA_ROOT"]), Path(config["BBOX_TRAIN_NAME"])))
-    valid_box_path = str(Path.joinpath(Path(config["DATA_ROOT"]), Path(config["BBOX_VALID_NAME"])))
-    test_box_path = str(Path.joinpath(Path(config["DATA_ROOT"]), Path(config["BBOX_TEST_NAME"])))
+    rgb_path = str(os.path.join(config["DATA_ROOT"], config["TIF_NAME"]))
+    trees_path = str(os.path.join(config["DATA_ROOT"], config["BBOX_TREES_NAME"]))
+    train_box_path = str(os.path.join(config["DATA_ROOT"], config["BBOX_TRAIN_NAME"]))
+    valid_box_path = str(os.path.join(config["DATA_ROOT"], config["BBOX_VALID_NAME"]))
+    test_box_path = str(os.path.join(config["DATA_ROOT"], config["BBOX_TEST_NAME"]))
 
     class_config = ClassConfig(names=['tree'], colors=['white'])
 
