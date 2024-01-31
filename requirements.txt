@@ -1,0 +1,5 @@
+geopandas==0.13.2
+matplotlib==3.7.1
+numpy==1.25.0
+PyYAML==6.0.1
+rastervision==0.21.3
