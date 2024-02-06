@@ -79,8 +79,15 @@ class Tilerizer:
                 agb = None
             elif self.annot_path.suffix == '.csv':
                 annots = pd.read_csv(self.annot_path)
-                annots = annots[annots['img_path'] == self.data_path.name]
-                labels = annots[['xmin', 'ymin', 'xmax', 'ymax']].values.tolist()
+
+                file_name_prefix = self.data_path.name.split('.')[-2]
+
+                if 'img_name' in annots and 'Xmin' in annots and file_name_prefix in set(annots['img_name']):
+                    annots = annots[annots['img_name'] == file_name_prefix]
+                    labels = annots[['Xmin', 'Ymin', 'Xmax', 'Ymax']].values.tolist()
+                else:
+                    annots = annots[annots['img_path'] == self.data_path.name]
+                    labels = annots[['xmin', 'ymin', 'xmax', 'ymax']].values.tolist()
 
                 if 'group' in annots.columns:
                     categories = annots['group'].to_numpy()
