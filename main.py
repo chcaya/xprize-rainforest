@@ -1,6 +1,18 @@
-from engine.detector.train_pipeline import DetectorTrainingPipeline
-from config.config_loader import DEFAULT_CONFIG
+import argparse
+
+from mains import *
+
 
 if __name__ == "__main__":
-    training_pipeline = DetectorTrainingPipeline(config=DEFAULT_CONFIG)
-    training_pipeline.plot_data_to_disk(show_images=False)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--task", type=str, help="The task to perform.")
+    parser.add_argument("--config_path", type=str, help="Path to the appropriate .yaml config file.")
+    args = parser.parse_args()
+
+    task = args.task
+    config_path = args.config_path
+
+    if task == "preprocess":
+        preprocessor_main(config_path)
+    elif task == "train_detector":
+        detector_training_main(config_path)
