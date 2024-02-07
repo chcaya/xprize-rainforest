@@ -97,7 +97,7 @@ class Tilerizer:
                     agb = annots['AGB'].to_numpy()
                 else:
                     categories = None
-            elif self.annot_path.suffix in ['.geojson', '.gpkg']:
+            elif self.annot_path.suffix in ['.geojson', '.gpkg', '.shp']:
                 labels = self._load_polygons_labels_and_convert_to_pixels(
                     polygon_file_path=self.annot_path,
                     tif_file_path=self.data_path
@@ -124,10 +124,10 @@ class Tilerizer:
         """
 
         # Load polygons
-        if polygon_file_path.suffix in ['.geojson', '.gpkg']:
+        if polygon_file_path.suffix in ['.geojson', '.gpkg', '.shp']:
             polygons = gpd.read_file(polygon_file_path)
         else:
-            raise ValueError("Unsupported file format for polygons. Please use GeoJSON or GPKG.")
+            raise ValueError("Unsupported file format for polygons. Please use GeoJSON (.geojson), GPKG (.gpkg) or Shapefile (.shp).")
 
         # Load TIFF file and check CRS
         with rasterio.open(tif_file_path) as src:
