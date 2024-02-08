@@ -6,6 +6,20 @@ from shapely.geometry import Polygon
 from rastervision.core.data import Scene
 
 
+def custom_collate_fn(batch):
+    images = []
+    boxes = []
+
+    for x in batch:
+        images.append(x['image'])
+        boxes.append({
+            'boxes': x['boxes'],
+            'labels': x['labels']
+        })
+
+    return images, boxes
+
+
 def display_train_valid_test_aoi(train_scene: Scene, valid_scene: Scene, test_scene: Scene, show_image: bool, output_file: str or None):
     img = train_scene.raster_source[:, :]
 
