@@ -48,6 +48,8 @@ class DetectorTrainingConfig(BaseConfig):
 
     batch_size: int
     learning_rate: float
+    scheduler_step_size: int
+    scheduler_gamma: float
     n_epochs: int
     rcnn_backbone_model_resnet_name: str
     rcnn_backbone_model_pretrained: bool
@@ -70,6 +72,8 @@ class DetectorTrainingConfig(BaseConfig):
 
         self.batch_size = config['model_config']['batch_size']
         self.learning_rate = float(config['model_config']['learning_rate'])
+        self.scheduler_step_size = config['model_config']['scheduler_step_size']
+        self.scheduler_gamma = config['model_config']['scheduler_gamma']
         self.n_epochs = config['model_config']['n_epochs']
         self.rcnn_backbone_model_resnet_name = config['model_config']['rcnn_backbone_model_resnet_name']
         self.rcnn_backbone_model_pretrained = config['model_config']['rcnn_backbone_model_pretrained']

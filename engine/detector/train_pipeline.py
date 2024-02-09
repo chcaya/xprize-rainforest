@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
 from typing import Any
-
-import torch
+import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
 import torchmetrics.detection
 from torch.utils.data import DataLoader
 from torchvision.models.detection import FasterRCNN
@@ -18,12 +18,20 @@ from engine.detector.dataset import TilesObjectDetectionDataset
 
 
 class CustomFasterRCNN(pl.LightningModule):
-    def __init__(self, lr: float):
+    def __init__(self,
+                 lr: float,
+                 scheduler_step_size: int,
+                 scheduler_gamma: float,
+                 box_detections_per_img: int,
+                 rcnn_backbone_model_pretrained: bool):
         super(CustomFasterRCNN, self).__init__()
         self.lr = lr
+        self.scheduler_step_size = scheduler_step_size
+        self.scheduler_gamma = scheduler_gamma
+        self.box_detections_per_img = box_detections_per_img
 
         # Load a pre-trained ResNet50 model
-        backbone = resnet_fpn_backbone('resnet50', pretrained=True)
+        backbone = resnet_fpn_backbone('resnet50', pretrained=rcnn_backbone_model_pretrained)
 
         # Define an anchor generator
         rpn_anchor_generator = AnchorGenerator(
@@ -36,16 +44,17 @@ class CustomFasterRCNN(pl.LightningModule):
             backbone,
             num_classes=2,  # 1 class + background
             rpn_anchor_generator=rpn_anchor_generator,
-            box_detections_per_img=100
+            box_detections_per_img=self.box_detections_per_img
         )
 
         self.map_metric = torchmetrics.detection.MeanAveragePrecision(iou_type="bbox",
-                                                                      iou_thresholds=None,#[0.2, 0.4, 0.6],
+                                                                      iou_thresholds=None,  # [0.2, 0.4, 0.6],
                                                                       extended_summary=True)
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+        optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.0005)
+        scheduler = StepLR(optimizer, step_size=self.scheduler_step_size, gamma=self.scheduler_gamma)
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     def forward(self, images, targets):
         return self.model(images, targets)
@@ -71,17 +80,17 @@ class DetectorTrainingPipeline:
     @staticmethod
     def _get_data_augmentation_transform():
         data_augmentation_transform = A.Compose([
-                A.Flip(),
-                A.ShiftScaleRotate(),
-                A.OneOf([
-                    A.HueSaturationValue(hue_shift_limit=10),
-                    A.RGBShift(),
-                    A.ToGray(),
-                    A.ToSepia(),
-                    A.RandomBrightness(),
-                    A.RandomGamma(),
-                ])
-            ],
+            A.Flip(),
+            A.ShiftScaleRotate(),
+            A.OneOf([
+                A.HueSaturationValue(hue_shift_limit=10),
+                A.RGBShift(),
+                A.ToGray(),
+                A.ToSepia(),
+                A.RandomBrightness(),
+                A.RandomGamma(),
+            ])
+        ],
             bbox_params=A.BboxParams(
                 format='pascal_voc',  # Specify the format of your bounding boxes
                 label_fields=['labels'],  # Specify the field that contains the labels
@@ -105,7 +114,11 @@ class DetectorTrainingPipeline:
                                                flush_secs=10)
         trainer = pl.Trainer(max_epochs=self.config.n_epochs,
                              logger=[tensorboard_logger])
-        model = CustomFasterRCNN(lr=self.config.learning_rate)
+        model = CustomFasterRCNN(lr=self.config.learning_rate,
+                                 scheduler_step_size=self.config.scheduler_step_size,
+                                 scheduler_gamma=self.config.scheduler_gamma,
+                                 box_detections_per_img=self.config.box_predictions_per_image,
+                                 rcnn_backbone_model_pretrained=self.config.rcnn_backbone_model_pretrained)
 
         # Train the model
         trainer.fit(model, train_dl, valid_dl)
