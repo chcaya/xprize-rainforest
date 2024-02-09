@@ -1,13 +1,8 @@
-import os
 from pathlib import Path
-from typing import Any
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 import torchmetrics.detection
 from torch.utils.data import DataLoader
-from torchvision.models.detection import FasterRCNN
-from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 import albumentations as A

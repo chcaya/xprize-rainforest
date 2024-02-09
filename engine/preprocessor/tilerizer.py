@@ -4,7 +4,6 @@ import laspy
 import rasterio
 import pickle
 import xmltodict
-import yaml
 from pathlib import Path
 from PIL import Image
 import einops
