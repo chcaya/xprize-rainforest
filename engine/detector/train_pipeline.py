@@ -15,6 +15,7 @@ import albumentations as A
 from config.config_parser.config_parsers import DetectorTrainingConfig
 from engine.detector.utils import custom_collate_fn
 from engine.detector.dataset import TilesObjectDetectionDataset
+from engine.detector.model import get_model
 
 
 class CustomFasterRCNN(pl.LightningModule):
@@ -29,23 +30,11 @@ class CustomFasterRCNN(pl.LightningModule):
         self.scheduler_step_size = scheduler_step_size
         self.scheduler_gamma = scheduler_gamma
         self.box_detections_per_img = box_detections_per_img
+        self.rcnn_backbone_model_pretrained = rcnn_backbone_model_pretrained
 
-        # Load a pre-trained ResNet50 model
-        backbone = resnet_fpn_backbone('resnet50', pretrained=rcnn_backbone_model_pretrained)
-
-        # Define an anchor generator
-        rpn_anchor_generator = AnchorGenerator(
-            sizes=((32,), (64,), (128,), (256,), (512,)),  # Adjust the sizes as needed
-            aspect_ratios=((0.5, 1.0, 2.0),) * 5  # Adjust the aspect ratios as needed
-        )
-
-        # Create the Faster R-CNN model
-        self.model = FasterRCNN(
-            backbone,
-            num_classes=2,  # 1 class + background
-            rpn_anchor_generator=rpn_anchor_generator,
-            box_detections_per_img=self.box_detections_per_img
-        )
+        # Get the Faster R-CNN model
+        self.model = get_model(rcnn_backbone_model_pretrained=self.rcnn_backbone_model_pretrained,
+                               box_detections_per_img=self.box_detections_per_img)
 
         self.map_metric = torchmetrics.detection.MeanAveragePrecision(iou_type="bbox",
                                                                       iou_thresholds=None,  # [0.2, 0.4, 0.6],
