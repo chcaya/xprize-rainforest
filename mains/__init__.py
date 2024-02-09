@@ -1,0 +1,2 @@
+from mains.detector_train_main import detector_training_main
+from mains.preprocessor_main import preprocessor_main
