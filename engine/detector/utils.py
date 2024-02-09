@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from matplotlib import patches as mpatches
 from shapely.geometry import Polygon
 from rastervision.core.data import Scene
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 
 def custom_collate_fn(batch):
@@ -18,6 +20,40 @@ def custom_collate_fn(batch):
         })
 
     return images, boxes
+
+
+def display_image_with_boxes(image, boxes, box_format='xyxy'):
+    """
+    Displays an image with bounding boxes.
+
+    Parameters:
+    - image: an image.
+    - boxes: A list of bounding boxes, each box specified as [x_min, y_min, x_max, y_max] for 'xyxy' format
+             or [x_center, y_center, width, height] for 'cxcywh' format.
+    - box_format: Format of the bounding boxes provided ('xyxy' or 'cxcywh'). Default is 'xyxy'.
+    """
+
+    # Create a Matplotlib figure and axis
+    fig, ax = plt.subplots(1, figsize=(15, 15))
+    ax.imshow(image)
+
+    # Plot each bounding box
+    for box in boxes:
+        if box_format == 'cxcywh':  # Convert from center-size format to corner format if necessary
+            x_center, y_center, width, height = box
+            x_min = x_center - width / 2
+            y_min = y_center - height / 2
+        else:  # Assuming 'xyxy' format
+            x_min, y_min, x_max, y_max = box
+            width, height = x_max - x_min, y_max - y_min
+
+        # Create a Rectangle patch
+        rect = patches.Rectangle((x_min, y_min), width, height, linewidth=1, edgecolor='r', facecolor='none')
+
+        # Add the patch to the Axes
+        ax.add_patch(rect)
+
+    plt.show()
 
 
 def display_train_valid_test_aoi(train_scene: Scene, valid_scene: Scene, test_scene: Scene, show_image: bool, output_file: str or None):
