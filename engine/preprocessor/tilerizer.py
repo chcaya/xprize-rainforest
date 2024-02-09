@@ -215,6 +215,13 @@ class Tilerizer:
                 window = rasterio.windows.Window(col, row, tile_size, tile_size)
                 tile = self.data[:, window.row_off:window.row_off + window.height,
                        window.col_off:window.col_off + window.width]
+
+                # If it's >50% black pixels or white pixels, just continue. No point segmenting it.
+                if np.sum(tile == 0) / (tile_size * tile_size * self.data.shape[0]) > 0.5:
+                    continue
+                if np.sum(tile == 255) / (tile_size * tile_size * self.data.shape[0]) > 0.5:
+                    continue
+
                 if self.metadata:
                     tile_profile = self.metadata.copy()
                     tile_profile.update({
