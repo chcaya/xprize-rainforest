@@ -333,21 +333,6 @@ class Tilerizer:
     #     return x_dist, y_dist
 
 
-# def test_image(neontree_path):
-#     tif_path = neontree_path / 'training' / 'RGB' / '2018_BART_4_322000_4882000_image_crop.tif'
-#     annot_path = neontree_path / 'annotations' / '2018_BART_4_322000_4882000_image_crop.xml'
-#     tilerizer = Tilerizer(tif_path, annot_path)
-#     samples = tilerizer.create_tiles()
-#
-#
-# def test_pointcloud(neontree_path):
-#     with open(neontree_path / 'lidar_annots_paths.yml', 'r') as fp:
-#         paths = yaml.safe_load(fp)
-#     pc_path = Path(paths['training']['annot_laz'][0])
-#     tilerizer = Tilerizer(pc_path, task='segmentation', modality='point_cloud')
-#     samples = tilerizer.create_subpointcloud()
-
-
 if __name__ == '__main__':
     # neontree_path = Paths().get()['neontree']
     # # test_image(neontree_path)
