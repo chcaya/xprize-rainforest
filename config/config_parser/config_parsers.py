@@ -6,32 +6,37 @@ from dataclasses import dataclass
 
 @dataclass
 class PreprocessorConfig(BaseConfig):
-    data_path: str
-    annot_path: str
+    raster_path: str
+    labels_path: str
     output_folder: str
     tile_size: int
     tile_overlap: float
     scale_factor: int
 
-    aoi_xmin: float
-    aoi_ymin: float
-    aoi_xmax: float
-    aoi_ymax: float
+    aoi_config: str
+    aoi_type: str
+    aois: dict
+
+    ignore_black_white_alpha_tiles_threshold: float
+    ignore_tiles_without_labels: bool
+    main_label_category_column_name: str
 
     def __init__(self, config_path: str):
         super().__init__()
         config = self.load_yaml_config(config_path)
 
-        self.data_path = config['data_path']
-        self.annot_path = config['annot_path']
+        self.raster_path = config['raster_path']
+        self.labels_path = config['labels_path']
         self.output_folder = config['output_folder']
         self.tile_size = config['tile_size']
         self.tile_overlap = config['tile_overlap']
         self.scale_factor = config['scale_factor']
-        self.aoi_xmin = config['area_of_interest']['xmin']
-        self.aoi_ymin = config['area_of_interest']['ymin']
-        self.aoi_xmax = config['area_of_interest']['xmax']
-        self.aoi_ymax = config['area_of_interest']['ymax']
+        self.aoi_config = config['area_of_interest']['aoi_config']
+        self.aoi_type = config['area_of_interest']['aoi_type']
+        self.aois = config['area_of_interest']['aois']
+        self.ignore_black_white_alpha_tiles_threshold = config['ignore_black_white_alpha_tiles_threshold']
+        self.ignore_tiles_without_labels = config['ignore_tiles_without_labels']
+        self.main_label_category_column_name = config['main_label_category_column_name']
 
 
 @dataclass
