@@ -8,7 +8,7 @@ ignore_black_white_alpha_tiles_threshold: 0.8
 ignore_tiles_without_labels: True
 main_label_category_column_name: 'Label'
 area_of_interest: {
-    config: 'generate',
+    aoi_config: 'generate',
     aoi_type: 'band',
     aois: {
       'train': {

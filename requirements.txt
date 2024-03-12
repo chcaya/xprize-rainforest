@@ -1,6 +1,6 @@
 einops==0.7.0
 geopandas==0.13.2
-geodataset @ git+ssh://git@github.com/hugobaudchon/geodataset.git@9f5be1e844c66439e3d52ee73a004a7c66efb103
+geodataset @ git+ssh://git@github.com/hugobaudchon/geodataset.git@9ecef8dc44414c1a2655d4b42bf7569b0dbf3d1b
 laspy==2.5.3
 numpy==1.25.0
 pandas==2.2.0

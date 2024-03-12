@@ -1,14 +1,11 @@
 from pathlib import Path
-from shapely import box
 
 from config.config_parser.config_parsers import PreprocessorConfig
 from geodataset.tilerize import RasterTilerizer, LabeledRasterTilerizer
 from geodataset.aoi import AOIGeneratorConfig, AOIFromPackageConfig
 
 
-def preprocessor_main(config_path: str):
-    config = PreprocessorConfig(config_path)
-
+def preprocessor_main(config: PreprocessorConfig):
     if not config.aoi_config:
         aois_config = AOIGeneratorConfig(
             aoi_type="band",
@@ -35,6 +32,7 @@ def preprocessor_main(config_path: str):
             tile_overlap=config.tile_overlap,
             aois_config=aois_config,
             scale_factor=config.scale_factor,
+            ground_resolution=config.ground_resolution,
             ignore_black_white_alpha_tiles_threshold=config.ignore_black_white_alpha_tiles_threshold,
             ignore_tiles_without_labels=config.ignore_tiles_without_labels,
             main_label_category_column_name=config.main_label_category_column_name)
@@ -48,6 +46,7 @@ def preprocessor_main(config_path: str):
             tile_overlap=config.tile_overlap,
             aois_config=aois_config,
             scale_factor=config.scale_factor,
+            ground_resolution=config.ground_resolution,
             ignore_black_white_alpha_tiles_threshold=config.ignore_black_white_alpha_tiles_threshold,
         )
 

@@ -1,2 +1,3 @@
-from mains.detector_train_main import detector_training_main
+from mains.detector_mains import detector_train_main, detector_score_main
 from mains.preprocessor_main import preprocessor_main
+from mains.xprize_main import xprize_main
