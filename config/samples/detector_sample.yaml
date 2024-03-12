@@ -3,13 +3,13 @@ batch_size: 25
 architecture:
     name: 'basic'
     rcnn_backbone_model_resnet_name: 'resnet50'
-    rcnn_backbone_model_pretrained: true
 train:
     output:
         output_folder: './output'
         output_name: 'detector_1'
         train_log_interval: 50      # in step=batch
     model_config:
+        rcnn_backbone_model_pretrained: true
         start_checkpoint_state_dict_path: null
         learning_rate: 5e-4
         n_epochs: 500

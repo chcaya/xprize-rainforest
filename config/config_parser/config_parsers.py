@@ -105,7 +105,7 @@ class DetectorTrainConfig(BaseConfig):
             data_root_path=config['data_root_path'],
             architecture=architecture_config['name'],
             rcnn_backbone_model_resnet_name=architecture_config['rcnn_backbone_model_resnet_name'],
-            rcnn_backbone_model_pretrained=architecture_config['rcnn_backbone_model_pretrained'],
+            rcnn_backbone_model_pretrained=model_config['rcnn_backbone_model_pretrained'],
             start_checkpoint_state_dict_path=model_config['start_checkpoint_state_dict_path'],
             batch_size=config['batch_size'],
             learning_rate=model_config['learning_rate'],
@@ -128,6 +128,7 @@ class DetectorTrainConfig(BaseConfig):
                     'train_log_interval': self.train_log_interval
                 },
                 'model_config': {
+                    'rcnn_backbone_model_pretrained': self.rcnn_backbone_model_pretrained,
                     'start_checkpoint_state_dict_path': self.start_checkpoint_state_dict_path,
                     'learning_rate': self.learning_rate,
                     'scheduler_step_size': self.scheduler_step_size,
@@ -140,8 +141,7 @@ class DetectorTrainConfig(BaseConfig):
             },
             'architecture': {
                 'name': self.architecture,
-                'rcnn_backbone_model_resnet_name': self.rcnn_backbone_model_resnet_name,
-                'rcnn_backbone_model_pretrained': self.rcnn_backbone_model_pretrained
+                'rcnn_backbone_model_resnet_name': self.rcnn_backbone_model_resnet_name
             }
         }
 
