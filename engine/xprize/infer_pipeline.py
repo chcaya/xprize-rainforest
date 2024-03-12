@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 from shapely import box
 
@@ -33,40 +34,78 @@ class XPrizePipeline:
 
         # Detecting trees
         print('Detecting trees...')
-        infer_ds = UnlabeledRasterDataset(root_path=Path(self.preprocessor_output_folder),
+        infer_ds = UnlabeleFdRasterDataset(root_path=Path(self.preprocessor_output_folder),
                                           fold="infer",
                                           transform=None)  # No augmentation for inference
         detector_config = self._get_detector_infer_config()
         inferer = DetectorInferencePipeline.from_config(detector_config)
+
         detector_result = inferer.infer(infer_ds=infer_ds, collate_fn=collate_fn_images)
+        detector_result = [{k: v.cpu().numpy() for k, v in x.items()} for x in detector_result]
+        for x in detector_result:
+            x['boxes'] = [box(*b) for b in x['boxes']]
+            x['scores'] = x['scores'].tolist()
+        boxes = [x['boxes'] for x in detector_result]
+        scores = [x['scores'] for x in detector_result]
+
         detector_output_name = CocoNameConvention.create_name(product_name=self.raster_name,
                                                               fold="infer",
                                                               scale_factor=self.config.scale_factor,
                                                               ground_resolution=self.config.ground_resolution)
         print('Saving trees to disk into a COCO file...')
-        self._generate_detector_inference_coco(tiles_paths=list(infer_ds),
-                                               detector_result=detector_result,
+        self._generate_detector_inference_coco(tiles_paths=list(infer_ds.tile_paths),  # Important: don't shuffle the infer_ds or the dataloader,
+                                                                                       # or it will mess up the tiles_paths order with the detected boxes.
+                                               boxes=boxes,
+                                               scores=scores,
                                                output_path=self.detector_output_folder / f'{detector_output_name}')
 
-    def _generate_detector_inference_coco(self, tiles_paths: list, detector_result: list, output_path: Path):
+        # Aggregating detected trees
+        print('Aggregating (de-duplicating) detected trees...')
+        a = 0  # TODO
+
+    def _generate_detector_inference_coco(self, tiles_paths: list, boxes: list, scores: list, output_path: Path):
+        images_cocos = []
         detections_cocos = []
-        for tile_id, (tile_path, tile_detections) in enumerate(zip(tiles_paths, detector_result)):
-            boxes = tile_detections['boxes'].cpu().numpy()
-            scores = tile_detections['scores'].cpu().numpy()
-            for i in range(len(tile_detections['boxes'])):
+        for tile_id, (tile_path, tile_boxes, tile_boxes_scores) in enumerate(zip(tiles_paths, boxes, scores)):
+            images_cocos.append({
+                "id": tile_id,
+                "width": self.config.tile_size,
+                "height": self.config.tile_size,
+                "file_name": str(tile_path.name),
+            })
+
+            for i in range(len(tile_boxes)):
                 detections_cocos.append(generate_label_coco(
-                    polygon=box(*boxes[i]),
+                    polygon=tile_boxes[i],
                     tile_height=self.config.tile_size,
                     tile_width=self.config.tile_size,
                     tile_id=tile_id,
                     use_rle_for_labels=True,
                     category_id=None,
-                    other_attributes_dict={'score': float(scores[i])}
+                    other_attributes_dict={'score': float(tile_boxes_scores[i])}
                 ))
 
         # Save the COCO dataset to a JSON file
         with output_path.open('w') as f:
-            json.dump({"annotations": detections_cocos}, f, ensure_ascii=False, indent=2)
+            json.dump({
+                "info": {
+                    "description": f"Inference for the product '{Path(self.config.raster_path).name}'"
+                                   f" with the model architecture '{self.config.detector_architecture}',"
+                                   f" backbone '{self.config.detector_rcnn_backbone_model_resnet_name}'"
+                                   f" and the checkpoint '{self.config.detector_checkpoint_state_dict_path}'."
+                                   f" The scale_factor is '{self.config.scale_factor}'"
+                                   f" and ground_resolution is '{self.config.ground_resolution}'.",
+                    "dataset_name": str(Path(self.config.raster_path).name),
+                    "version": "1.0",
+                    "year": str(date.today().year),
+                    "date_created": str(date.today())
+                },
+                "licenses": [
+                    # add license?
+                ],
+                "images": images_cocos,
+                "annotations": detections_cocos,
+                "categories": None}, f, ensure_ascii=False, indent=2)
 
     def _get_preprocessor_config(self):
         preprocessor_config = PreprocessorConfig(
@@ -98,4 +137,3 @@ class XPrizePipeline:
         )
 
         return detector_infer_config
-

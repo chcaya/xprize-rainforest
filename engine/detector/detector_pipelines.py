@@ -252,7 +252,10 @@ class DetectorInferencePipeline(DetectorBasePipeline):
         predictions = []
 
         with torch.no_grad():
-            for images in data_loader:
+            data_loader_with_progress = tqdm(data_loader,
+                                             desc="Inferring...",
+                                             leave=True)
+            for images in data_loader_with_progress:
                 images = list(img.to(self.device) for img in images)
                 outputs = self.model(images)
                 predictions.extend(outputs)
