@@ -6,6 +6,7 @@ from shapely import box
 from geodataset.dataset import UnlabeledRasterDataset
 from geodataset.utils import generate_label_coco, strip_all_extensions
 from geodataset.utils.file_name_conventions import CocoNameConvention, validate_and_convert_product_name
+from geodataset.aggregator import DetectionAggregator
 
 from config.config_parser.config_parsers import XPrizeConfig, PreprocessorConfig, DetectorInferConfig
 from engine.detector.detector_pipelines import DetectorInferencePipeline
@@ -19,9 +20,11 @@ class XPrizePipeline:
         self.raster_name = validate_and_convert_product_name(strip_all_extensions(Path(self.config.raster_path)))
         self.preprocessor_output_folder = Path(self.config.output_folder) / 'preprocessor_output'
         self.detector_output_folder = Path(self.config.output_folder) / 'detector_output'
+        self.aggregator_output_folder = Path(self.config.output_folder) / 'aggregator_output'
 
         self.preprocessor_output_folder.mkdir(parents=True, exist_ok=True)
         self.detector_output_folder.mkdir(parents=True, exist_ok=True)
+        self.aggregator_output_folder.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def from_config(cls, xprize_config: XPrizeConfig):
@@ -34,7 +37,7 @@ class XPrizePipeline:
 
         # Detecting trees
         print('Detecting trees...')
-        infer_ds = UnlabeleFdRasterDataset(root_path=Path(self.preprocessor_output_folder),
+        infer_ds = UnlabeledRasterDataset(root_path=Path(self.preprocessor_output_folder),
                                           fold="infer",
                                           transform=None)  # No augmentation for inference
         detector_config = self._get_detector_infer_config()
@@ -61,7 +64,12 @@ class XPrizePipeline:
 
         # Aggregating detected trees
         print('Aggregating (de-duplicating) detected trees...')
-        a = 0  # TODO
+        DetectionAggregator.from_boxes(geojson_output_path=self.aggregator_output_folder / f'test_output_08_scores04.geojson',  # TODO change output name
+                                       boxes=boxes,
+                                       scores=scores,
+                                       tiles_paths=list(infer_ds.tile_paths),
+                                       min_score_threshold=0.4,         # TODO add these parameters in the config file
+                                       intersect_remove_ratio=0.8)
 
     def _generate_detector_inference_coco(self, tiles_paths: list, boxes: list, scores: list, output_path: Path):
         images_cocos = []
