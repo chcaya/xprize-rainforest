@@ -55,7 +55,7 @@ class XPrizePipeline:
                                                               fold="infer",
                                                               scale_factor=self.config.scale_factor,
                                                               ground_resolution=self.config.ground_resolution)
-        print('Saving trees to disk into a COCO file...')
+        print('Saving tree boxes to disk in a COCO file...')
         self._generate_detector_inference_coco(tiles_paths=list(infer_ds.tile_paths),  # Important: don't shuffle the infer_ds or the dataloader,
                                                                                        # or it will mess up the tiles_paths order with the detected boxes.
                                                boxes=boxes,
@@ -64,12 +64,17 @@ class XPrizePipeline:
 
         # Aggregating detected trees
         print('Aggregating (de-duplicating) detected trees...')
-        DetectionAggregator.from_boxes(geojson_output_path=self.aggregator_output_folder / f'test_output_08_scores04.geojson',  # TODO change output name
+        aggregator_output_name = (f'aggregator_output'
+                                  f'_{str(self.config.aggregator_score_threshold).replace(".", "")}'
+                                  f'_{self.config.aggregator_nms_algorithm}'
+                                  f'_{str(self.config.aggregator_nms_threshold).replace(".", "")}.geojson')
+        DetectionAggregator.from_boxes(geojson_output_path=self.aggregator_output_folder / aggregator_output_name,
                                        boxes=boxes,
                                        scores=scores,
                                        tiles_paths=list(infer_ds.tile_paths),
-                                       min_score_threshold=0.4,         # TODO add these parameters in the config file
-                                       intersect_remove_ratio=0.8)
+                                       score_threshold=self.config.aggregator_score_threshold,
+                                       nms_threshold=self.config.aggregator_nms_threshold,
+                                       nms_algorithm=self.config.aggregator_nms_algorithm)
 
     def _generate_detector_inference_coco(self, tiles_paths: list, boxes: list, scores: list, output_path: Path):
         images_cocos = []

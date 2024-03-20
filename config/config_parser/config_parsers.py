@@ -217,11 +217,16 @@ class XPrizeConfig(BaseConfig):
     detector_rcnn_backbone_model_resnet_name: str
     detector_box_predictions_per_image: int
 
+    aggregator_score_threshold: float
+    aggregator_nms_threshold: float
+    aggregator_nms_algorithm: str
+
     @classmethod
     def from_config_path(cls, config_path: str):
         config = cls.load_yaml_config(config_path)
         tilerizer_config = config['tilerizer']
         detector_config = config['detector']
+        aggregator_config = config['aggregator']
 
         return cls(
             raster_path=config['raster_path'],
@@ -238,7 +243,10 @@ class XPrizeConfig(BaseConfig):
             detector_checkpoint_state_dict_path=detector_config['checkpoint_state_dict_path'],
             detector_architecture=detector_config['architecture']['name'],
             detector_rcnn_backbone_model_resnet_name=detector_config['architecture']['rcnn_backbone_model_resnet_name'],
-            detector_box_predictions_per_image=detector_config['box_predictions_per_image']
+            detector_box_predictions_per_image=detector_config['box_predictions_per_image'],
+            aggregator_score_threshold=aggregator_config['score_threshold'],
+            aggregator_nms_threshold=aggregator_config['nms_threshold'],
+            aggregator_nms_algorithm=aggregator_config['nms_algorithm']
         )
 
     def save_yaml_config(self, output_path: Path):
