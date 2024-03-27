@@ -1,26 +1,52 @@
-data_root_path: 'Data/pre_processed/all_datasets'
-batch_size: 25
-architecture:
-    name: 'basic'
-    rcnn_backbone_model_resnet_name: 'resnet50'
-train:
-    output:
-        output_folder: './output'
-        output_name: 'detector_1'
-        train_log_interval: 50      # in step=batch
-    model_config:
-        rcnn_backbone_model_pretrained: true
-        start_checkpoint_state_dict_path: null
-        learning_rate: 5e-4
-        n_epochs: 500
-        save_model_every_n_epoch: 5
-        backbone_resnet_out_channels: 2048
-        box_predictions_per_image: 250
-        scheduler_step_size: 10     # here, step=epochs
-        scheduler_gamma: 0.1
-score:
-    checkpoint_state_dict_path: './output/detector_quebec/detector_checkpoint.pt'
-    box_predictions_per_image: 250
-infer:
-    checkpoint_state_dict_path: './output/detector_quebec/detector_checkpoint.pt'
-    box_predictions_per_image: 250
+detector:
+    train:
+        io:
+            data_root: 'Data/pre_processed/all_datasets'
+            train_aoi_name: 'train'
+            valid_aoi_name: 'valid'
+            output_folder: './output'
+            output_name: 'detector_1'
+            train_log_interval: 50      # every n batches
+        base_params:
+            batch_size: 25
+            box_predictions_per_image: 250
+        architecture:
+            architecture_name: 'basic'
+            rcnn_backbone_model_resnet_name: 'resnet50'
+        model_config:
+            rcnn_backbone_model_pretrained: true
+            start_checkpoint_state_dict_path: null
+            learning_rate: 5e-4
+            n_epochs: 500
+            save_model_every_n_epoch: 5
+            backbone_resnet_out_channels: 2048
+            scheduler_step_size: 10     # here, step=epochs
+            scheduler_gamma: 0.1
+
+    score:
+        io:
+            data_root: 'Data/pre_processed/all_datasets'
+            score_aoi_name: 'test'
+            output_folder: './output/test/detector_score'
+            coco_n_workers: 10
+            checkpoint_state_dict_path: './output/detector_1/detector_1_20.pt'
+        base_params:
+            batch_size: 25
+            box_predictions_per_image: 250
+        architecture:
+            architecture_name: 'basic'
+            rcnn_backbone_model_resnet_name: 'resnet50'
+
+    infer:
+        io:
+            input_tiles_root: 'Data\pre_processed\all_datasets\quebec_trees\2021_09_02_sbl_z1_rgb_cog\tiles'
+            infer_aoi_name: 'infer'
+            output_folder: './output/test/detector_infer'
+            coco_n_workers: 10
+            checkpoint_state_dict_path: './output/detector_1/detector_1_20.pt'
+        base_params:
+            batch_size: 25
+            box_predictions_per_image: 250
+        architecture:
+            architecture_name: 'basic'
+            rcnn_backbone_model_resnet_name: 'resnet50'

@@ -1,11 +1,16 @@
 from pathlib import Path
 
-from config.config_parser.config_parsers import PreprocessorConfig
+
 from geodataset.tilerize import RasterTilerizer, LabeledRasterTilerizer
 from geodataset.aoi import AOIGeneratorConfig, AOIFromPackageConfig
 
+from config.config_parsers.tilerizer_parsers import TilerizerCLIConfig
 
-def preprocessor_main(config: PreprocessorConfig):
+
+def tilerizer_main(config: TilerizerCLIConfig):
+    output_folder = Path(config.output_folder)
+    output_folder.mkdir(exist_ok=False, parents=True)
+
     if not config.aoi_config:
         aois_config = AOIGeneratorConfig(
             aoi_type="band",
@@ -51,5 +56,9 @@ def preprocessor_main(config: PreprocessorConfig):
         )
 
         tilerizer.generate_tiles()
+
+    config.save_yaml_config(output_path=output_folder / "tilerizer_config.yaml")
+
+    return tilerizer.tiles_path
 
 

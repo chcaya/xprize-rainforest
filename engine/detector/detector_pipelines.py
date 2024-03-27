@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import albumentations as A
 from tqdm import tqdm
 
-from config.config_parser.config_parsers import DetectorTrainConfig, DetectorScoreConfig, DetectorInferConfig
+from config.config_parsers.detector_parsers import DetectorTrainCLIConfig, DetectorScoreCLIConfig, DetectorInferCLIConfig
 from engine.detector.model import Detector
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 
@@ -69,17 +69,17 @@ class DetectorScorePipeline(DetectorBasePipeline):
         ).to(self.device)
 
     @classmethod
-    def from_config(cls, detector_score_config: DetectorScoreConfig):
-        return cls(batch_size=detector_score_config.batch_size,
-                   architecture=detector_score_config.architecture,
+    def from_config(cls, detector_score_config: DetectorScoreCLIConfig):
+        return cls(batch_size=detector_score_config.base_params_config.batch_size,
+                   architecture=detector_score_config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=detector_score_config.checkpoint_state_dict_path,
-                   rcnn_backbone_model_resnet_name=detector_score_config.rcnn_backbone_model_resnet_name,
+                   rcnn_backbone_model_resnet_name=detector_score_config.architecture_config.rcnn_backbone_model_resnet_name,
                    rcnn_backbone_model_pretrained=False,
-                   box_predictions_per_image=detector_score_config.box_predictions_per_image)
+                   box_predictions_per_image=detector_score_config.base_params_config.box_predictions_per_image)
 
     def _evaluate(self, data_loader, epoch=None):
         self.model.eval()
-
+        predictions = []
         with torch.no_grad():
             data_loader_with_progress = tqdm(data_loader,
                                              desc=f"Epoch {epoch + 1} (scoring)" if epoch is not None else "Scoring",
@@ -89,6 +89,7 @@ class DetectorScorePipeline(DetectorBasePipeline):
                 targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
                 outputs = self.model(images, targets)
+                predictions.extend(outputs)
 
                 # Update MAP metric for validation
                 with warnings.catch_warnings():
@@ -99,26 +100,27 @@ class DetectorScorePipeline(DetectorBasePipeline):
         scores = self.map_metric.compute()
         self.map_metric.reset()  # Reset metric for next epoch/validation
 
-        return scores
+        return scores, predictions
 
     def score(self, test_ds: DetectionLabeledRasterCocoDataset, collate_fn: callable):
         test_dl = DataLoader(test_ds, batch_size=self.batch_size, shuffle=False,
                              collate_fn=collate_fn,
                              num_workers=3, persistent_workers=True)
 
-        results = self._evaluate(test_dl)
-        return results
+        scores, predictions = self._evaluate(test_dl)
+        print(f"Score results: {scores}")
+        return scores, predictions
 
 
 class DetectorTrainPipeline(DetectorScorePipeline):
-    def __init__(self, detector_train_config: DetectorTrainConfig):
+    def __init__(self, detector_train_config: DetectorTrainCLIConfig):
         self.config = detector_train_config
-        super().__init__(batch_size=self.config.batch_size,
-                         architecture=self.config.architecture,
+        super().__init__(batch_size=self.config.base_params_config.batch_size,
+                         architecture=self.config.architecture_config.architecture_name,
                          checkpoint_state_dict_path=self.config.start_checkpoint_state_dict_path,
-                         rcnn_backbone_model_resnet_name=self.config.rcnn_backbone_model_resnet_name,
+                         rcnn_backbone_model_resnet_name=self.config.architecture_config.rcnn_backbone_model_resnet_name,
                          rcnn_backbone_model_pretrained=self.config.rcnn_backbone_model_pretrained,
-                         box_predictions_per_image=self.config.box_predictions_per_image)
+                         box_predictions_per_image=self.config.base_params_config.box_predictions_per_image)
 
         self.output_folder = Path(self.config.output_folder)
         self.output_folder.mkdir(exist_ok=True)
@@ -140,7 +142,7 @@ class DetectorTrainPipeline(DetectorScorePipeline):
                                     flush_secs=10)
 
     @classmethod
-    def from_config(cls, detector_train_config: DetectorTrainConfig):
+    def from_config(cls, detector_train_config: DetectorTrainCLIConfig):
         return cls(detector_train_config=detector_train_config)
 
     def _save_model(self, save_path):
@@ -173,19 +175,20 @@ class DetectorTrainPipeline(DetectorScorePipeline):
               valid_ds: DetectionLabeledRasterCocoDataset,
               collate_fn: callable):
         params = [p for p in self.model.parameters() if p.requires_grad]
+
         optimizer = optim.SGD(params, lr=self.config.learning_rate, momentum=0.9, weight_decay=0.0005)
         scheduler = StepLR(optimizer, step_size=self.config.scheduler_step_size, gamma=self.config.scheduler_gamma)
 
-        train_dl = DataLoader(train_ds, batch_size=self.config.batch_size, shuffle=True,
+        train_dl = DataLoader(train_ds, batch_size=self.config.base_params_config.batch_size, shuffle=True,
                               collate_fn=collate_fn,
                               num_workers=3, persistent_workers=True)
-        valid_dl = DataLoader(valid_ds, batch_size=self.config.batch_size, shuffle=False,
+        valid_dl = DataLoader(valid_ds, batch_size=self.config.base_params_config.batch_size, shuffle=False,
                               collate_fn=collate_fn,
                               num_workers=3, persistent_workers=True)
 
         for epoch in range(self.config.n_epochs):
             self._train_one_epoch(optimizer, train_dl, epoch=epoch)
-            scores = self._evaluate(valid_dl, epoch=epoch)
+            scores, predictions = self._evaluate(valid_dl, epoch=epoch)
             self.writer.add_scalar('metric/map', scores['map'], (epoch + 1) * len(train_dl))
             self.writer.add_scalar('metric/map_50', scores['map_50'], (epoch + 1) * len(train_dl))
             self.writer.add_scalar('metric/map_75', scores['map_75'], (epoch + 1) * len(train_dl))
@@ -238,13 +241,13 @@ class DetectorInferencePipeline(DetectorBasePipeline):
                          box_predictions_per_image=box_predictions_per_image)
 
     @classmethod
-    def from_config(cls, config: DetectorInferConfig):
-        return cls(batch_size=config.batch_size,
-                   architecture=config.architecture,
+    def from_config(cls, config: DetectorInferCLIConfig):
+        return cls(batch_size=config.base_params_config.batch_size,
+                   architecture=config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=config.checkpoint_state_dict_path,
-                   rcnn_backbone_model_resnet_name=config.rcnn_backbone_model_resnet_name,
+                   rcnn_backbone_model_resnet_name=config.architecture_config.rcnn_backbone_model_resnet_name,
                    rcnn_backbone_model_pretrained=False,
-                   box_predictions_per_image=config.box_predictions_per_image)
+                   box_predictions_per_image=config.base_params_config.box_predictions_per_image)
 
     def _infer(self, data_loader):
         self.model.eval()

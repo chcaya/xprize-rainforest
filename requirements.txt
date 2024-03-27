@@ -1,11 +1,12 @@
 einops==0.7.0
 geopandas==0.13.2
-geodataset @ git+ssh://git@github.com/hugobaudchon/geodataset.git@b644bc6a0e71f4a9b888819ead2fbf9cbe5b2449
+geodataset @ git+ssh://git@github.com/hugobaudchon/geodataset.git@6284abb707ac9ff247d61f7d4345f6b5da152311
 laspy==2.5.3
 numpy==1.25.0
 pandas==2.2.0
 PyYAML==6.0.1
 rasterio==1.3.7
+segment-anything @ git+https://github.com/facebookresearch/segment-anything.git@6fdee8f2727f4506cfbbe553e23b895e27956588
 shapely==2.0.1
 torch==2.0.1
 torchvision==0.15.2

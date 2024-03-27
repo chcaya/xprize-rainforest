@@ -1,30 +1,34 @@
-import json
-from datetime import date
+from dataclasses import asdict
 from pathlib import Path
 from shapely import box
 
-from geodataset.dataset import UnlabeledRasterDataset
-from geodataset.utils import generate_label_coco, strip_all_extensions
+from geodataset.dataset import UnlabeledRasterDataset, BoxesDataset
+from geodataset.utils import strip_all_extensions
 from geodataset.utils.file_name_conventions import CocoNameConvention, validate_and_convert_product_name
 from geodataset.aggregator import DetectionAggregator
 
-from config.config_parser.config_parsers import XPrizeConfig, PreprocessorConfig, DetectorInferConfig
+from config.config_parsers.aggregator_parsers import AggregatorCLIConfig
+from config.config_parsers.detector_parsers import DetectorInferCLIConfig
+from config.config_parsers.segmenter_parsers import SegmenterInferCLIConfig
+from config.config_parsers.tilerizer_parsers import TilerizerCLIConfig
+from config.config_parsers.xprize_parsers import XPrizeConfig
 from engine.detector.detector_pipelines import DetectorInferencePipeline
-from engine.detector.utils import collate_fn_images
-from mains import preprocessor_main
+from engine.detector.utils import collate_fn_images, generate_detector_inference_coco, detector_result_to_lists
+from engine.segmenter.sam import SamPredictorWrapper
+from mains import tilerizer_main
+from mains.aggregator_main import aggregator_main
+from mains.detector_mains import detector_infer_main
+from mains.segmenter_main import segmenter_infer_main
 
 
 class XPrizePipeline:
     def __init__(self, xprize_config: XPrizeConfig):
         self.config = xprize_config
         self.raster_name = validate_and_convert_product_name(strip_all_extensions(Path(self.config.raster_path)))
-        self.preprocessor_output_folder = Path(self.config.output_folder) / 'preprocessor_output'
+        self.tilerizer_output_folder = Path(self.config.output_folder) / 'tilerizer_output'
         self.detector_output_folder = Path(self.config.output_folder) / 'detector_output'
         self.aggregator_output_folder = Path(self.config.output_folder) / 'aggregator_output'
-
-        self.preprocessor_output_folder.mkdir(parents=True, exist_ok=True)
-        self.detector_output_folder.mkdir(parents=True, exist_ok=True)
-        self.aggregator_output_folder.mkdir(parents=True, exist_ok=True)
+        self.sam_output_folder = Path(self.config.output_folder) / 'sam_output'
 
     @classmethod
     def from_config(cls, xprize_config: XPrizeConfig):
@@ -32,121 +36,63 @@ class XPrizePipeline:
 
     def run(self):
         # Creating tiles
-        preprocessor_config = self._get_preprocessor_config()
-        preprocessor_main(preprocessor_config)
+        tilerizer_config = self._get_tilerizer_config()
+        tiles_path = tilerizer_main(config=tilerizer_config)
 
         # Detecting trees
-        print('Detecting trees...')
-        infer_ds = UnlabeledRasterDataset(root_path=Path(self.preprocessor_output_folder),
-                                          fold="infer",
-                                          transform=None)  # No augmentation for inference
         detector_config = self._get_detector_infer_config()
-        inferer = DetectorInferencePipeline.from_config(detector_config)
-
-        detector_result = inferer.infer(infer_ds=infer_ds, collate_fn=collate_fn_images)
-        detector_result = [{k: v.cpu().numpy() for k, v in x.items()} for x in detector_result]
-        for x in detector_result:
-            x['boxes'] = [box(*b) for b in x['boxes']]
-            x['scores'] = x['scores'].tolist()
-        boxes = [x['boxes'] for x in detector_result]
-        scores = [x['scores'] for x in detector_result]
-
-        detector_output_name = CocoNameConvention.create_name(product_name=self.raster_name,
-                                                              fold="infer",
-                                                              scale_factor=self.config.scale_factor,
-                                                              ground_resolution=self.config.ground_resolution)
-        print('Saving tree boxes to disk in a COCO file...')
-        self._generate_detector_inference_coco(tiles_paths=list(infer_ds.tile_paths),  # Important: don't shuffle the infer_ds or the dataloader,
-                                                                                       # or it will mess up the tiles_paths order with the detected boxes.
-                                               boxes=boxes,
-                                               scores=scores,
-                                               output_path=self.detector_output_folder / f'{detector_output_name}')
+        detector_coco_output_path = detector_infer_main(config=detector_config)
 
         # Aggregating detected trees
-        print('Aggregating (de-duplicating) detected trees...')
-        aggregator_output_name = (f'aggregator_output'
-                                  f'_{str(self.config.aggregator_score_threshold).replace(".", "")}'
-                                  f'_{self.config.aggregator_nms_algorithm}'
-                                  f'_{str(self.config.aggregator_nms_threshold).replace(".", "")}.geojson')
-        DetectionAggregator.from_boxes(geojson_output_path=self.aggregator_output_folder / aggregator_output_name,
-                                       boxes=boxes,
-                                       scores=scores,
-                                       tiles_paths=list(infer_ds.tile_paths),
-                                       score_threshold=self.config.aggregator_score_threshold,
-                                       nms_threshold=self.config.aggregator_nms_threshold,
-                                       nms_algorithm=self.config.aggregator_nms_algorithm)
+        aggregator_config = self._get_aggregator_config(tiles_path=tiles_path,
+                                                        detector_coco_output_path=detector_coco_output_path)
+        aggregator_output_file = aggregator_main(config=aggregator_config)
 
-    def _generate_detector_inference_coco(self, tiles_paths: list, boxes: list, scores: list, output_path: Path):
-        images_cocos = []
-        detections_cocos = []
-        for tile_id, (tile_path, tile_boxes, tile_boxes_scores) in enumerate(zip(tiles_paths, boxes, scores)):
-            images_cocos.append({
-                "id": tile_id,
-                "width": self.config.tile_size,
-                "height": self.config.tile_size,
-                "file_name": str(tile_path.name),
-            })
+        # Predicting tree instance segmentations
+        segmenter_config = self._get_segmenter_infer_config(aggregator_output_file=aggregator_output_file)
+        segmenter_output_file = segmenter_infer_main(config=segmenter_config)
 
-            for i in range(len(tile_boxes)):
-                detections_cocos.append(generate_label_coco(
-                    polygon=tile_boxes[i],
-                    tile_height=self.config.tile_size,
-                    tile_width=self.config.tile_size,
-                    tile_id=tile_id,
-                    use_rle_for_labels=True,
-                    category_id=None,
-                    other_attributes_dict={'score': float(tile_boxes_scores[i])}
-                ))
-
-        # Save the COCO dataset to a JSON file
-        with output_path.open('w') as f:
-            json.dump({
-                "info": {
-                    "description": f"Inference for the product '{Path(self.config.raster_path).name}'"
-                                   f" with the model architecture '{self.config.detector_architecture}',"
-                                   f" backbone '{self.config.detector_rcnn_backbone_model_resnet_name}'"
-                                   f" and the checkpoint '{self.config.detector_checkpoint_state_dict_path}'."
-                                   f" The scale_factor is '{self.config.scale_factor}'"
-                                   f" and ground_resolution is '{self.config.ground_resolution}'.",
-                    "dataset_name": str(Path(self.config.raster_path).name),
-                    "version": "1.0",
-                    "year": str(date.today().year),
-                    "date_created": str(date.today())
-                },
-                "licenses": [
-                    # add license?
-                ],
-                "images": images_cocos,
-                "annotations": detections_cocos,
-                "categories": None}, f, ensure_ascii=False, indent=2)
-
-    def _get_preprocessor_config(self):
-        preprocessor_config = PreprocessorConfig(
+    def _get_tilerizer_config(self):
+        preprocessor_config = TilerizerCLIConfig(
+            **self.config.tilerizer_config.as_dict(),
             raster_path=self.config.raster_path,
+            output_folder=str(self.tilerizer_output_folder),
             labels_path=None,
-            output_folder=str(self.preprocessor_output_folder),
-            tile_size=self.config.tile_size,
-            tile_overlap=self.config.tile_overlap,
-            scale_factor=self.config.scale_factor,
-            ground_resolution=self.config.ground_resolution,
-            aoi_config=self.config.aoi_config,
-            aoi_type=self.config.aoi_type,
-            aois=self.config.aois,
-            ignore_black_white_alpha_tiles_threshold=self.config.ignore_black_white_alpha_tiles_threshold,
-            ignore_tiles_without_labels=False,
-            main_label_category_column_name=None
+            ignore_tiles_without_labels=True,
+            main_label_category_column_name=None,
         )
 
         return preprocessor_config
 
     def _get_detector_infer_config(self):
-        detector_infer_config = DetectorInferConfig(
-            data_root_path=str(self.preprocessor_output_folder),
-            architecture=self.config.detector_architecture,
-            rcnn_backbone_model_resnet_name=self.config.detector_rcnn_backbone_model_resnet_name,
-            batch_size=self.config.detector_batch_size,
-            checkpoint_state_dict_path=self.config.detector_checkpoint_state_dict_path,
-            box_predictions_per_image=self.config.detector_box_predictions_per_image
+        detector_infer_config = DetectorInferCLIConfig(
+            **self.config.detector_infer_config.as_dict(),
+            input_tiles_root=str(self.tilerizer_output_folder),
+            infer_aoi_name='infer',
+            output_folder=str(self.detector_output_folder),
+            coco_n_workers=self.config.coco_n_workers
         )
 
         return detector_infer_config
+
+    def _get_aggregator_config(self,
+                               tiles_path: Path,
+                               detector_coco_output_path: Path):
+        aggregator_config = AggregatorCLIConfig(
+            **self.config.aggregator_config.as_dict(),
+            input_tiles_root=str(tiles_path),
+            coco_path=str(detector_coco_output_path),
+            output_folder=str(self.aggregator_output_folder),
+        )
+
+        return aggregator_config
+
+    def _get_segmenter_infer_config(self, aggregator_output_file: Path):
+        segmenter_infer_config = SegmenterInferCLIConfig(
+            **self.config.sam_infer_config.as_dict(),
+            raster_path=self.config.raster_path,
+            boxes_path=str(aggregator_output_file),
+            output_folder=str(self.sam_output_folder),
+        )
+
+        return segmenter_infer_config

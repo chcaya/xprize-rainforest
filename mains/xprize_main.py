@@ -1,4 +1,4 @@
-from config.config_parser.config_parsers import XPrizeConfig
+from config.config_parsers.xprize_parsers import XPrizeConfig
 from engine.xprize.infer_pipeline import XPrizePipeline
 
 
