@@ -7,7 +7,7 @@ This project is a pipeline for processing geospatial data, specifically for the 
 Clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/your-repo/xprize-rainforest.git
+git clone https://github.com/hugobaudchon/xprize-rainforest.git
 cd xprize-rainforest
 ```
 
