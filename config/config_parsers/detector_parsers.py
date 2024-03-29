@@ -40,7 +40,7 @@ class DetectorArchitectureConfig(BaseIntermediateConfig):
 
 
 @dataclass
-class DetectorTrainCLIConfig(BaseConfig):
+class DetectorTrainIOConfig(BaseConfig):
     data_root: str
     output_folder: str
     output_name: str
@@ -158,7 +158,7 @@ class DetectorScoreConfig(BaseConfig):
 
 
 @dataclass
-class DetectorScoreCLIConfig(DetectorScoreConfig):
+class DetectorScoreIOConfig(DetectorScoreConfig):
     data_root: str
     score_aoi_name: str
     output_folder: str
@@ -224,7 +224,7 @@ class DetectorInferConfig(BaseConfig):
 
 
 @dataclass
-class DetectorInferCLIConfig(DetectorInferConfig):
+class DetectorInferIOConfig(DetectorInferConfig):
     input_tiles_root: str
     infer_aoi_name: str
     output_folder: str

@@ -1,11 +1,11 @@
 import argparse
 
-from config.config_parsers.aggregator_parsers import AggregatorCLIConfig
-from config.config_parsers.detector_parsers import DetectorScoreCLIConfig, DetectorInferCLIConfig, \
-    DetectorTrainCLIConfig
-from config.config_parsers.segmenter_parsers import SegmenterInferCLIConfig
-from config.config_parsers.tilerizer_parsers import TilerizerCLIConfig
-from config.config_parsers.xprize_parsers import XPrizeConfig
+from config.config_parsers.aggregator_parsers import AggregatorIOConfig
+from config.config_parsers.detector_parsers import DetectorScoreIOConfig, DetectorInferIOConfig, \
+    DetectorTrainIOConfig
+from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
+from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
+from config.config_parsers.xprize_parsers import XPrizeIOConfig
 from mains import *
 from mains.aggregator_main import aggregator_main
 from mains.detector_mains import detector_infer_main
@@ -24,23 +24,23 @@ if __name__ == "__main__":
     config_path = args.config_path
 
     if task == "xprize":
-        config = XPrizeConfig.from_config_path(config_path)
+        config = XPrizeIOConfig.from_config_path(config_path)
         xprize_main(config)
     if task == "tilerizer":
-        config = TilerizerCLIConfig.from_config_path(config_path)
+        config = TilerizerIOConfig.from_config_path(config_path)
         tilerizer_main(config)
     elif task == "detector" and subtask == "train":
-        config = DetectorTrainCLIConfig.from_config_path(config_path)
+        config = DetectorTrainIOConfig.from_config_path(config_path)
         detector_train_main(config)
     elif task == "detector" and subtask == "score":
-        config = DetectorScoreCLIConfig.from_config_path(config_path)
+        config = DetectorScoreIOConfig.from_config_path(config_path)
         detector_score_main(config)
     elif task == "detector" and subtask == "infer":
-        config = DetectorInferCLIConfig.from_config_path(config_path)
+        config = DetectorInferIOConfig.from_config_path(config_path)
         detector_infer_main(config)
     elif task == "aggregator":
-        config = AggregatorCLIConfig.from_config_path(config_path)
+        config = AggregatorIOConfig.from_config_path(config_path)
         aggregator_main(config)
     elif task == "segmenter" and subtask == "infer":
-        config = SegmenterInferCLIConfig.from_config_path(config_path)
+        config = SegmenterInferIOConfig.from_config_path(config_path)
         segmenter_infer_main(config)

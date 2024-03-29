@@ -5,14 +5,14 @@ from pathlib import Path
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 from geodataset.utils import TileNameConvention, CocoNameConvention
 
-from config.config_parsers.detector_parsers import DetectorTrainCLIConfig, DetectorScoreCLIConfig, \
-    DetectorInferCLIConfig
+from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, \
+    DetectorInferIOConfig
 from engine.detector.utils import collate_fn_detection, collate_fn_images, detector_result_to_lists, \
     generate_detector_inference_coco
 from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorScorePipeline, DetectorInferencePipeline
 
 
-def detector_train_main(config: DetectorTrainCLIConfig):
+def detector_train_main(config: DetectorTrainIOConfig):
     trainer = DetectorTrainPipeline.from_config(config)
     train_ds = DetectionLabeledRasterCocoDataset(root_path=Path(config.data_root),
                                                  fold=config.train_aoi_name,
@@ -23,7 +23,7 @@ def detector_train_main(config: DetectorTrainCLIConfig):
     trainer.train(train_ds=train_ds, valid_ds=valid_ds, collate_fn=collate_fn_detection)
 
 
-def detector_score_main(config: DetectorScoreCLIConfig):
+def detector_score_main(config: DetectorScoreIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 
@@ -65,7 +65,7 @@ def detector_score_main(config: DetectorScoreCLIConfig):
     config.save_yaml_config(output_path=output_folder / "detector_score_config.yaml")
 
 
-def detector_infer_main(config: DetectorInferCLIConfig):
+def detector_infer_main(config: DetectorInferIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 

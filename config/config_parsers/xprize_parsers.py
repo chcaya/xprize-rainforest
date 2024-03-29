@@ -8,7 +8,7 @@ from config.config_parsers.tilerizer_parsers import TilerizerConfig
 
 
 @dataclass
-class XPrizeConfig(BaseConfig):
+class XPrizeIOConfig(BaseConfig):
     raster_path: str
     output_folder: str
     coco_n_workers: int
@@ -25,10 +25,12 @@ class XPrizeConfig(BaseConfig):
         aggregator_config = AggregatorConfig.from_dict(config)
         sam_infer_config = SegmenterInferConfig.from_dict(config)
 
+        xprize_io_config = config['io']
+
         return cls(
-            raster_path=config['raster_path'],
-            output_folder=config['output_folder'],
-            coco_n_workers=config['coco_n_workers'],
+            raster_path=xprize_io_config['raster_path'],
+            output_folder=xprize_io_config['output_folder'],
+            coco_n_workers=xprize_io_config['coco_n_workers'],
             tilerizer_config=tilerizer_config,
             detector_infer_config=detector_infer_config,
             aggregator_config=aggregator_config,
@@ -37,13 +39,15 @@ class XPrizeConfig(BaseConfig):
 
     def to_structured_dict(self):
         config = {
-            'raster_path': self.raster_path,
-            'output_folder': self.output_folder,
-            'coco_n_workers': self.coco_n_workers,
-            'tilerizer': self.tilerizer_config.to_structured_dict(),
-            'detector': self.detector_infer_config.to_structured_dict(),
-            'aggregator': self.aggregator_config.to_structured_dict(),
-            'sam': self.sam_infer_config.to_structured_dict()
+            'io': {
+                'raster_path': self.raster_path,
+                'output_folder': self.output_folder,
+                'coco_n_workers': self.coco_n_workers,
+            },
+            'tilerizer': self.tilerizer_config.to_structured_dict()['tilerizer'],
+            'detector': self.detector_infer_config.to_structured_dict()['detector'],
+            'aggregator': self.aggregator_config.to_structured_dict()['aggregator'],
+            'segmenter': self.sam_infer_config.to_structured_dict()['segmenter']
         }
 
         return config

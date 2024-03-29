@@ -2,10 +2,10 @@ from pathlib import Path
 
 from geodataset.aggregator import DetectionAggregator
 
-from config.config_parsers.aggregator_parsers import AggregatorCLIConfig
+from config.config_parsers.aggregator_parsers import AggregatorIOConfig
 
 
-def aggregator_main(config: AggregatorCLIConfig):
+def aggregator_main(config: AggregatorIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 

@@ -1,5 +1,7 @@
-raster_path: 'Data/raw/quebec_trees_dataset_2021-09-02/2021-09-02/zone1/2021-09-02-sbl-z1-rgb-cog.tif'
-output_folder: 'Data/infer/scene_1'
+io:
+    raster_path: 'Data\raw\Neon_training\RGB\2019_DELA_5_423000_3601000_image_crop.tif'
+    output_folder: './output/test/xprize'
+    coco_n_workers: 5
 
 tilerizer:
     tile_size: 1024

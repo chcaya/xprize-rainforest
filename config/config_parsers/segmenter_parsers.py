@@ -38,7 +38,7 @@ class SegmenterInferConfig(BaseConfig):
 
 
 @dataclass
-class SegmenterInferCLIConfig(SegmenterInferConfig):
+class SegmenterInferIOConfig(SegmenterInferConfig):
     raster_path: str
     boxes_path: str
     output_folder: str

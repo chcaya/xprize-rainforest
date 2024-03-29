@@ -2,11 +2,11 @@ from pathlib import Path
 
 from geodataset.dataset import BoxesDataset
 
-from config.config_parsers.segmenter_parsers import SegmenterInferCLIConfig
+from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from engine.segmenter.sam import SamPredictorWrapper
 
 
-def segmenter_infer_main(config: SegmenterInferCLIConfig):
+def segmenter_infer_main(config: SegmenterInferIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 

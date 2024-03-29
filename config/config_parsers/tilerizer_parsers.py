@@ -52,7 +52,7 @@ class TilerizerConfig(BaseConfig):
 
 
 @dataclass
-class TilerizerCLIConfig(TilerizerConfig):
+class TilerizerIOConfig(TilerizerConfig):
     raster_path: str
     output_folder: str
     labels_path: str or None

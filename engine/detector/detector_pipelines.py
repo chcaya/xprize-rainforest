@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 import albumentations as A
 from tqdm import tqdm
 
-from config.config_parsers.detector_parsers import DetectorTrainCLIConfig, DetectorScoreCLIConfig, DetectorInferCLIConfig
+from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, DetectorInferIOConfig
 from engine.detector.model import Detector
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 
@@ -69,7 +69,7 @@ class DetectorScorePipeline(DetectorBasePipeline):
         ).to(self.device)
 
     @classmethod
-    def from_config(cls, detector_score_config: DetectorScoreCLIConfig):
+    def from_config(cls, detector_score_config: DetectorScoreIOConfig):
         return cls(batch_size=detector_score_config.base_params_config.batch_size,
                    architecture=detector_score_config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=detector_score_config.checkpoint_state_dict_path,
@@ -113,7 +113,7 @@ class DetectorScorePipeline(DetectorBasePipeline):
 
 
 class DetectorTrainPipeline(DetectorScorePipeline):
-    def __init__(self, detector_train_config: DetectorTrainCLIConfig):
+    def __init__(self, detector_train_config: DetectorTrainIOConfig):
         self.config = detector_train_config
         super().__init__(batch_size=self.config.base_params_config.batch_size,
                          architecture=self.config.architecture_config.architecture_name,
@@ -142,7 +142,7 @@ class DetectorTrainPipeline(DetectorScorePipeline):
                                     flush_secs=10)
 
     @classmethod
-    def from_config(cls, detector_train_config: DetectorTrainCLIConfig):
+    def from_config(cls, detector_train_config: DetectorTrainIOConfig):
         return cls(detector_train_config=detector_train_config)
 
     def _save_model(self, save_path):
@@ -241,7 +241,7 @@ class DetectorInferencePipeline(DetectorBasePipeline):
                          box_predictions_per_image=box_predictions_per_image)
 
     @classmethod
-    def from_config(cls, config: DetectorInferCLIConfig):
+    def from_config(cls, config: DetectorInferIOConfig):
         return cls(batch_size=config.base_params_config.batch_size,
                    architecture=config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=config.checkpoint_state_dict_path,

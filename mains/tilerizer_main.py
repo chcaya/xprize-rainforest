@@ -4,10 +4,10 @@ from pathlib import Path
 from geodataset.tilerize import RasterTilerizer, LabeledRasterTilerizer
 from geodataset.aoi import AOIGeneratorConfig, AOIFromPackageConfig
 
-from config.config_parsers.tilerizer_parsers import TilerizerCLIConfig
+from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
 
 
-def tilerizer_main(config: TilerizerCLIConfig):
+def tilerizer_main(config: TilerizerIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 

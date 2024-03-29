@@ -31,7 +31,7 @@ class AggregatorConfig(BaseConfig):
 
 
 @dataclass
-class AggregatorCLIConfig(AggregatorConfig):
+class AggregatorIOConfig(AggregatorConfig):
     input_tiles_root: str
     coco_path: str
     output_folder: str
