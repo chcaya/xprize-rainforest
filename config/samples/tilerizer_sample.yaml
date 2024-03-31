@@ -5,8 +5,9 @@ tilerizer:
     output_folder: 'Data/pre_processed/quebec_trees/Z1_quebec_trees'
   tile_size: 1024
   tile_overlap: 0.5
-  scale_factor: null
-  ground_resolution: 0.05
+  raster_resolution:
+    scale_factor: null
+    ground_resolution: 0.05
   ignore_black_white_alpha_tiles_threshold: 0.8
   ignore_tiles_without_labels: True
   main_label_category_column_name: 'Label'

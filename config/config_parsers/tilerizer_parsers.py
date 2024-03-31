@@ -1,14 +1,31 @@
 from dataclasses import dataclass
 
-from config.config_parsers.base_config_parsers import BaseConfig
+from config.config_parsers.base_config_parsers import BaseConfig, BaseIntermediateConfig
+
+
+@dataclass
+class RasterResolutionConfig(BaseIntermediateConfig):
+    scale_factor: float
+    ground_resolution: float
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        return cls(**config)
+
+    def to_structured_dict(self):
+        config = {
+            'scale_factor': self.scale_factor,
+            'ground_resolution': self.ground_resolution,
+        }
+
+        return config
 
 
 @dataclass
 class TilerizerConfig(BaseConfig):
     tile_size: int
     tile_overlap: float
-    scale_factor: float
-    ground_resolution: float
+    raster_resolution_config: RasterResolutionConfig
 
     aoi_config: str
     aoi_type: str
@@ -20,12 +37,12 @@ class TilerizerConfig(BaseConfig):
     def from_dict(cls, config: dict):
         tilerizer_config = config['tilerizer']
         aoi_config = tilerizer_config['area_of_interest']
+        raster_resolution_config = RasterResolutionConfig.from_dict(tilerizer_config['raster_resolution'])
 
         return cls(
             tile_size=tilerizer_config['tile_size'],
             tile_overlap=tilerizer_config['tile_overlap'],
-            scale_factor=tilerizer_config['scale_factor'],
-            ground_resolution=tilerizer_config['ground_resolution'],
+            raster_resolution_config=raster_resolution_config,
             aoi_config=aoi_config['aoi_config'],
             aoi_type=aoi_config['aoi_type'],
             aois=aoi_config['aois'],
@@ -37,8 +54,7 @@ class TilerizerConfig(BaseConfig):
             'tilerizer': {
                 'tile_size': self.tile_size,
                 'tile_overlap': self.tile_overlap,
-                'scale_factor': self.scale_factor,
-                'ground_resolution': self.ground_resolution,
+                'raster_resolution_config': self.raster_resolution_config.to_structured_dict(),
                 'area_of_interest': {
                     'aoi_config': self.aoi_config,
                     'aoi_type': self.aoi_type,

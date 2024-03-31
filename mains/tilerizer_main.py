@@ -36,8 +36,8 @@ def tilerizer_main(config: TilerizerIOConfig):
             tile_size=config.tile_size,
             tile_overlap=config.tile_overlap,
             aois_config=aois_config,
-            scale_factor=config.scale_factor,
-            ground_resolution=config.ground_resolution,
+            scale_factor=config.raster_resolution_config.scale_factor,
+            ground_resolution=config.raster_resolution_config.ground_resolution,
             ignore_black_white_alpha_tiles_threshold=config.ignore_black_white_alpha_tiles_threshold,
             ignore_tiles_without_labels=config.ignore_tiles_without_labels,
             main_label_category_column_name=config.main_label_category_column_name)
@@ -50,8 +50,8 @@ def tilerizer_main(config: TilerizerIOConfig):
             tile_size=config.tile_size,
             tile_overlap=config.tile_overlap,
             aois_config=aois_config,
-            scale_factor=config.scale_factor,
-            ground_resolution=config.ground_resolution,
+            scale_factor=config.raster_resolution_config.scale_factor,
+            ground_resolution=config.raster_resolution_config.ground_resolution,
             ignore_black_white_alpha_tiles_threshold=config.ignore_black_white_alpha_tiles_threshold,
         )
 

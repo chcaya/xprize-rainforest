@@ -13,7 +13,9 @@ def segmenter_infer_main(config: SegmenterInferIOConfig):
     boxes_dataset = BoxesDataset(raster_path=Path(config.raster_path),
                                  boxes_path=Path(config.boxes_path),
                                  padding_percentage=config.padding_percentage,
-                                 min_pixel_padding=config.min_pixel_padding)
+                                 min_pixel_padding=config.min_pixel_padding,
+                                 scale_factor=config.raster_resolution_config.scale_factor,
+                                 ground_resolution=config.raster_resolution_config.ground_resolution)
 
     sam = SamPredictorWrapper(model_type=config.model_type,
                               checkpoint_path=config.checkpoint_path,

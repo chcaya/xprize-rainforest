@@ -6,8 +6,9 @@ io:
 tilerizer:
     tile_size: 1024
     tile_overlap: 0.5
-    scale_factor: null
-    ground_resolution: 0.05
+    raster_resolution:
+        scale_factor: null
+        ground_resolution: 0.05
     ignore_black_white_alpha_tiles_threshold: 0.8
     area_of_interest: {
         aoi_config: 'generate',
@@ -42,3 +43,6 @@ segmenter:
     simplify_tolerance: 1.0
     padding_percentage: 2.0
     min_pixel_padding: 100
+    raster_resolution:
+        scale_factor: null
+        ground_resolution: 0.05

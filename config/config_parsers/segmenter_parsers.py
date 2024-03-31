@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from config.config_parsers.base_config_parsers import BaseConfig
+from config.config_parsers.tilerizer_parsers import RasterResolutionConfig
 
 
 @dataclass
@@ -10,17 +11,20 @@ class SegmenterInferConfig(BaseConfig):
     simplify_tolerance: float
     padding_percentage: float
     min_pixel_padding: int
+    raster_resolution_config: RasterResolutionConfig
 
     @classmethod
     def from_dict(cls, config: dict):
         segmenter_config = config['segmenter']
+        raster_resolution_config = RasterResolutionConfig.from_dict(segmenter_config['raster_resolution'])
 
         return cls(
             model_type=segmenter_config['model_type'],
             checkpoint_path=segmenter_config['checkpoint_path'],
             simplify_tolerance=segmenter_config['simplify_tolerance'],
             padding_percentage=segmenter_config['padding_percentage'],
-            min_pixel_padding=segmenter_config['min_pixel_padding']
+            min_pixel_padding=segmenter_config['min_pixel_padding'],
+            raster_resolution_config=raster_resolution_config
         )
 
     def to_structured_dict(self):
