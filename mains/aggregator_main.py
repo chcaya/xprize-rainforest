@@ -12,9 +12,14 @@ def aggregator_main(config: AggregatorIOConfig):
     aggregator_output_name = (f'aggregator_output'
                               f'_{str(config.score_threshold).replace(".", "p")}'
                               f'_{config.nms_algorithm}'
-                              f'_{str(config.nms_threshold).replace(".", "p")}.geojson')
+                              f'_{str(config.nms_threshold).replace(".", "p")}')
+    if config.output_type in ['coco', 'geojson']:
+        aggregator_output_name += '.' + config.output_type
+    else:
+        raise ValueError(f"The aggregator parameter output_type must be 'coco' or 'geojson'. Got {config.output_type}.")
+
     aggregator_output_file = Path(config.output_folder) / aggregator_output_name
-    DetectionAggregator.from_coco(geojson_output_path=aggregator_output_file,
+    DetectionAggregator.from_coco(output_path=aggregator_output_file,
                                   coco_json_path=Path(config.coco_path),
                                   tiles_folder_path=Path(config.input_tiles_root),
                                   score_threshold=config.score_threshold,

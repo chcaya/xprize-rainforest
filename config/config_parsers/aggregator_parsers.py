@@ -35,6 +35,7 @@ class AggregatorIOConfig(AggregatorConfig):
     input_tiles_root: str
     coco_path: str
     output_folder: str
+    output_type: str
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -45,6 +46,7 @@ class AggregatorIOConfig(AggregatorConfig):
             input_tiles_root=aggregator_io_config['input_tiles_root'],
             coco_path=aggregator_io_config['coco_path'],
             output_folder=aggregator_io_config['output_folder'],
+            output_type=aggregator_io_config['output_type']
         )
 
     def to_structured_dict(self):
@@ -52,5 +54,6 @@ class AggregatorIOConfig(AggregatorConfig):
         config['aggregator']['io'] = {
             'input_tiles_root': self.input_tiles_root,
             'coco_path': self.coco_path,
-            'output_folder': self.output_folder
+            'output_folder': self.output_folder,
+            'output_type': self.output_type
         }
