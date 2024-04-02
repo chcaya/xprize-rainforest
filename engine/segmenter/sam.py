@@ -1,11 +1,11 @@
-from pathlib import Path
+from typing import List
 
 import numpy as np
-import shapely
 import torch
-from geodataset.dataset import BoxesDataset
+from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
 from geodataset.utils import apply_affine_transform
 from geopandas import GeoDataFrame
+import rasterio
 from segment_anything import SamPredictor, sam_model_registry
 from shapely.affinity import translate
 from tqdm import tqdm
@@ -26,13 +26,17 @@ class SamPredictorWrapper:
         sam.to(self.device)
         self.predictor = SamPredictor(sam)
 
-    def infer(self, image: np.ndarray, box: shapely.box):
+    def _infer(self, image: np.ndarray, boxes: List[np.array]):
         self.predictor.set_image(image)
-        box_array = np.array(box.bounds)
-        masks, _, _ = self.predictor.predict(box=box_array, multimask_output=False)
+        box_array = np.array(boxes)
+        box_tensor = torch.Tensor(box_array).to(self.device)
+        masks, _, _ = self.predictor.predict_torch(point_coords=None,
+                                                   point_labels=None,
+                                                   boxes=box_tensor,
+                                                   multimask_output=False)
         return masks
 
-    def infer_on_dataset(self, boxes_dataset: BoxesDataset, geojson_output_path: str):
+    def infer_on_single_box_dataset(self, boxes_dataset: BoxesDataset, geojson_output_path: str):
         mask_polygons = []
         dataset_with_progress = tqdm(boxes_dataset,
                                      desc="Inferring SAM...",
@@ -40,7 +44,7 @@ class SamPredictorWrapper:
         for image, box, (minx, miny) in dataset_with_progress:
             image = image[:3, :, :]
             image_hwc = image.transpose((1, 2, 0))
-            masks = self.infer(image=image_hwc, box=box)
+            masks = self._infer(image=image_hwc, boxes=[box.bounds])
 
             mask_polygon = mask_to_polygon(masks.squeeze(), simplify_tolerance=self.simplify_tolerance)
 
@@ -56,3 +60,29 @@ class SamPredictorWrapper:
 
         return gdf
 
+    def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset, geojson_output_path: str):
+        dataset_with_progress = tqdm(dataset,
+                                     desc="Inferring SAM...",
+                                     leave=True)
+        for tile_idx, (image, boxes_data) in enumerate(dataset_with_progress):
+            image = image[:3, :, :]
+            image_hwc = image.transpose((1, 2, 0))
+            image_hwc = (image_hwc * 255).astype(np.uint8)
+            masks = self._infer(image=image_hwc, boxes=boxes_data['boxes'])
+            masks = masks.cpu().numpy()
+            masks_polygons = [mask_to_polygon(mask.squeeze(), simplify_tolerance=self.simplify_tolerance) for mask
+                              in masks]
+            adjusted_masks_polygons = [translate(mask_polygon, xoff=0, yoff=0) for mask_polygon in masks_polygons]
+
+            tile_path = dataset.tiles[tile_idx]['path']
+            with rasterio.open(tile_path) as tile_raster:
+                # The affine transform (maps pixel locations to coordinates)
+
+                gdf = GeoDataFrame(geometry=adjusted_masks_polygons)                    # TODO is this necessary? If I store to coco we can just use pixel coordinates
+                gdf['geometry'] = gdf['geometry'].astype(object).apply(
+                    lambda geom: apply_affine_transform(geom, tile_raster.transform)
+                )
+                gdf.set_crs(tile_raster.crs, inplace=True)
+                gdf.to_file(geojson_output_path, driver='GeoJSON')
+
+        # TODO implement output to coco for this method

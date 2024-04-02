@@ -44,3 +44,5 @@ if __name__ == "__main__":
     elif task == "segmenter" and subtask == "infer":
         config = SegmenterInferIOConfig.from_config_path(config_path)
         segmenter_infer_main(config)
+    # TODO add utility function to convert a coco file and its tiles folder to geojson ??
+
