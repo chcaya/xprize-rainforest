@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from geodataset.aggregator import DetectionAggregator
+from geodataset.utils import CocoNameConvention
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
 
@@ -9,12 +10,15 @@ def aggregator_main(config: AggregatorIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 
-    aggregator_output_name = (f'aggregator_output'
-                              f'_{str(config.score_threshold).replace(".", "p")}'
-                              f'_{config.nms_algorithm}'
-                              f'_{str(config.nms_threshold).replace(".", "p")}.geojson')
-    aggregator_output_file = Path(config.output_folder) / aggregator_output_name
-    DetectionAggregator.from_coco(geojson_output_path=aggregator_output_file,
+    product_name, scale_factor, ground_resolution, fold = CocoNameConvention.parse_name(Path(config.coco_path).name)
+
+    coco_output_path = CocoNameConvention.create_name(product_name=product_name,
+                                                      fold=f"{fold}aggregator",
+                                                      scale_factor=scale_factor,
+                                                      ground_resolution=ground_resolution)
+
+    aggregator_output_file = Path(config.output_folder) / coco_output_path
+    DetectionAggregator.from_coco(output_path=aggregator_output_file,
                                   coco_json_path=Path(config.coco_path),
                                   tiles_folder_path=Path(config.input_tiles_root),
                                   score_threshold=config.score_threshold,

@@ -1,6 +1,7 @@
 import argparse
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
+from config.config_parsers.coco_to_geojson_parsers import CocoToGeojsonIOConfig
 from config.config_parsers.detector_parsers import DetectorScoreIOConfig, DetectorInferIOConfig, \
     DetectorTrainIOConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
@@ -8,6 +9,7 @@ from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
 from config.config_parsers.xprize_parsers import XPrizeIOConfig
 from mains import *
 from mains.aggregator_main import aggregator_main
+from mains.coco_to_geojson_main import coco_to_geojson_main
 from mains.detector_mains import detector_infer_main
 from mains.segmenter_main import segmenter_infer_main
 
@@ -44,3 +46,7 @@ if __name__ == "__main__":
     elif task == "segmenter" and subtask == "infer":
         config = SegmenterInferIOConfig.from_config_path(config_path)
         segmenter_infer_main(config)
+    elif task == "coco_to_geojson":
+        config = CocoToGeojsonIOConfig.from_config_path(config_path)
+        coco_to_geojson_main(config)
+

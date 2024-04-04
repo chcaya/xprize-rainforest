@@ -52,5 +52,5 @@ class AggregatorIOConfig(AggregatorConfig):
         config['aggregator']['io'] = {
             'input_tiles_root': self.input_tiles_root,
             'coco_path': self.coco_path,
-            'output_folder': self.output_folder
+            'output_folder': self.output_folder,
         }

@@ -3,12 +3,11 @@ from collections import defaultdict
 from pathlib import Path
 
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
-from geodataset.utils import TileNameConvention, CocoNameConvention
+from geodataset.utils import TileNameConvention, CocoNameConvention, COCOGenerator
 
 from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, \
     DetectorInferIOConfig
-from engine.detector.utils import collate_fn_detection, collate_fn_images, detector_result_to_lists, \
-    generate_detector_inference_coco
+from engine.detector.utils import collate_fn_detection, collate_fn_images, detector_result_to_lists
 from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorScorePipeline, DetectorInferencePipeline
 
 
@@ -54,13 +53,17 @@ def detector_score_main(config: DetectorScoreIOConfig):
     for raster_name, data in raster_to_boxes_scores.items():
         detector_output_name = CocoNameConvention.create_name(fold=config.score_aoi_name,
                                                               product_name=raster_name)
-        generate_detector_inference_coco(raster_name=raster_name,
-                                         tiles_paths=[tile_path for tile_path in tile_paths if
-                                                      tile_path_to_raster[tile_path] == raster_name],
-                                         boxes=data['boxes'],
-                                         scores=data['scores'],
-                                         output_path=output_folder / f'{detector_output_name}.json',
-                                         n_workers=config.coco_n_workers)
+        coco_generator = COCOGenerator(description=f"Inference (score) predictions for {raster_name}.",
+                                       tiles_paths=[tile_path for tile_path in tile_paths if tile_path_to_raster[tile_path] == raster_name],
+                                       polygons=data['boxes'],
+                                       scores=data['scores'],
+                                       categories=None,
+                                       other_attributes=None,
+                                       output_path=output_folder / detector_output_name,
+                                       use_rle_for_labels=True,
+                                       n_workers=config.coco_n_workers,
+                                       main_label_category_to_id_map=None)
+        coco_generator.generate_coco()
 
     config.save_yaml_config(output_path=output_folder / "detector_score_config.yaml")
 
@@ -92,14 +95,18 @@ def detector_infer_main(config: DetectorInferIOConfig):
     coco_output_path = output_folder / f'{coco_output_name}'
 
     print(f"Saving {sum([len(x) for x in boxes])} box predictions for {len(parsed_tiles_info)} tiles to a COCO file...")
-    generate_detector_inference_coco(raster_name=raster_name,
-                                     tiles_paths=list(infer_ds.tile_paths),
-                                     # Important: don't shuffle the infer_ds or the dataloader,
-                                     # or it will mess up the tiles_paths order with the detected boxes.
-                                     boxes=boxes,
-                                     scores=scores,
-                                     output_path=coco_output_path,
-                                     n_workers=config.coco_n_workers)
+
+    coco_generator = COCOGenerator(description=f"Inference predictions for {raster_name}.",
+                                   tiles_paths=list(infer_ds.tile_paths),
+                                   polygons=boxes,
+                                   scores=scores,
+                                   categories=None,
+                                   other_attributes=None,
+                                   output_path=coco_output_path,
+                                   use_rle_for_labels=True,
+                                   n_workers=config.coco_n_workers,
+                                   main_label_category_to_id_map=None)
+    coco_generator.generate_coco()
 
     config.save_yaml_config(output_path=output_folder / "detector_infer_config.yaml")
 
