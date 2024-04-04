@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from geodataset.dataset import BoxesDataset
+from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
+from geodataset.utils import CocoNameConvention
 
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from engine.segmenter.sam import SamPredictorWrapper
@@ -10,24 +11,29 @@ def segmenter_infer_main(config: SegmenterInferIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=False, parents=True)
 
-    boxes_dataset = BoxesDataset(raster_path=Path(config.raster_path),
-                                 boxes_path=Path(config.boxes_path),
-                                 padding_percentage=config.padding_percentage,
-                                 min_pixel_padding=config.min_pixel_padding,
-                                 scale_factor=config.raster_resolution_config.scale_factor,
-                                 ground_resolution=config.raster_resolution_config.ground_resolution)
+    product_name, scale_factor, ground_resolution, fold = CocoNameConvention.parse_name(Path(config.coco_path).name)
+
+    tiles_path = Path(config.input_tiles_root)
+    assert tiles_path.is_dir() and tiles_path.name == "tiles", \
+        "The tiles_path must be the path of a directory named 'tiles'."
+
+    dataset = DetectionLabeledRasterCocoDataset(fold=fold,
+                                                root_path=[Path(config.coco_path).parent,
+                                                           tiles_path.parent],
+                                                )
+
+    coco_output_path = CocoNameConvention.create_name(product_name=product_name,
+                                                      fold=f"{fold}segmenter",
+                                                      scale_factor=scale_factor,
+                                                      ground_resolution=ground_resolution)
 
     sam = SamPredictorWrapper(model_type=config.model_type,
                               checkpoint_path=config.checkpoint_path,
                               simplify_tolerance=config.simplify_tolerance)
-    sam_output_name = (f'sam_output'
-                       f'_{str(config.model_type)}'
-                       f'_{str(config.simplify_tolerance).replace(".", "p")}'
-                       f'_{str(config.padding_percentage).replace(".", "p")}.geojson')
-    sam_output_file = Path(config.output_folder) / sam_output_name
-    sam.infer_on_dataset(boxes_dataset=boxes_dataset,
-                         geojson_output_path=str(sam_output_file))
+    sam.infer_on_multi_box_dataset(dataset=dataset,
+                                   coco_json_output_path=output_folder / coco_output_path
+                                   )
 
     config.save_yaml_config(output_path=output_folder / "segmenter_infer_config.yaml")
 
-    return sam_output_file
+    return coco_output_path

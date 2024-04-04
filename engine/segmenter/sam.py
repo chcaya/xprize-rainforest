@@ -1,9 +1,10 @@
+from pathlib import Path
 from typing import List
 
 import numpy as np
 import torch
 from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
-from geodataset.utils import apply_affine_transform
+from geodataset.utils import apply_affine_transform, COCOGenerator
 from geopandas import GeoDataFrame
 import rasterio
 from segment_anything import SamPredictor, sam_model_registry
@@ -60,10 +61,12 @@ class SamPredictorWrapper:
 
         return gdf
 
-    def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset, geojson_output_path: str):
+    def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset, coco_json_output_path: Path):
         dataset_with_progress = tqdm(dataset,
                                      desc="Inferring SAM...",
                                      leave=True)
+        tiles_paths = []
+        tiles_masks = []
         for tile_idx, (image, boxes_data) in enumerate(dataset_with_progress):
             image = image[:3, :, :]
             image_hwc = image.transpose((1, 2, 0))
@@ -74,15 +77,19 @@ class SamPredictorWrapper:
                               in masks]
             adjusted_masks_polygons = [translate(mask_polygon, xoff=0, yoff=0) for mask_polygon in masks_polygons]
 
-            tile_path = dataset.tiles[tile_idx]['path']
-            with rasterio.open(tile_path) as tile_raster:
-                # The affine transform (maps pixel locations to coordinates)
+            tiles_paths.append(dataset.tiles[tile_idx]['path'])
+            tiles_masks.append(adjusted_masks_polygons)
 
-                gdf = GeoDataFrame(geometry=adjusted_masks_polygons)                    # TODO is this necessary? If I store to coco we can just use pixel coordinates
-                gdf['geometry'] = gdf['geometry'].astype(object).apply(
-                    lambda geom: apply_affine_transform(geom, tile_raster.transform)
-                )
-                gdf.set_crs(tile_raster.crs, inplace=True)
-                gdf.to_file(geojson_output_path, driver='GeoJSON')
-
-        # TODO implement output to coco for this method
+        coco_generator = COCOGenerator(
+            description=f"Aggregated boxes from multiple tiles.",
+            tiles_paths=tiles_paths,
+            polygons=tiles_masks,
+            scores=None,  # TODO add support for scores
+            categories=None,  # TODO add support for categories
+            other_attributes=None,  # TODO add support for other_attributes
+            output_path=coco_json_output_path,
+            use_rle_for_labels=True,  # TODO make this a parameter to the class
+            n_workers=5,  # TODO make this a parameter to the class
+            main_label_category_to_id_map=None  # TODO make this a parameter to the class
+        )
+        coco_generator.generate_coco()

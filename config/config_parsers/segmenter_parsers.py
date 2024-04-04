@@ -11,20 +11,17 @@ class SegmenterInferConfig(BaseConfig):
     simplify_tolerance: float
     padding_percentage: float
     min_pixel_padding: int
-    raster_resolution_config: RasterResolutionConfig
 
     @classmethod
     def from_dict(cls, config: dict):
         segmenter_config = config['segmenter']
-        raster_resolution_config = RasterResolutionConfig.from_dict(segmenter_config['raster_resolution'])
 
         return cls(
             model_type=segmenter_config['model_type'],
             checkpoint_path=segmenter_config['checkpoint_path'],
             simplify_tolerance=segmenter_config['simplify_tolerance'],
             padding_percentage=segmenter_config['padding_percentage'],
-            min_pixel_padding=segmenter_config['min_pixel_padding'],
-            raster_resolution_config=raster_resolution_config
+            min_pixel_padding=segmenter_config['min_pixel_padding']
         )
 
     def to_structured_dict(self):
@@ -43,8 +40,8 @@ class SegmenterInferConfig(BaseConfig):
 
 @dataclass
 class SegmenterInferIOConfig(SegmenterInferConfig):
-    raster_path: str
-    boxes_path: str
+    coco_path: str
+    input_tiles_root: str
     output_folder: str
 
     @classmethod
@@ -53,15 +50,15 @@ class SegmenterInferIOConfig(SegmenterInferConfig):
         segmenter_io_config = config['segmenter']['io']
         return cls(
             **parent_config.as_dict(),
-            raster_path=segmenter_io_config['raster_path'],
-            boxes_path=segmenter_io_config['boxes_path'],
+            coco_path=segmenter_io_config['coco_path'],
+            input_tiles_root=segmenter_io_config['input_tiles_root'],
             output_folder=segmenter_io_config['output_folder'],
         )
 
     def to_structured_dict(self):
         config = super().to_structured_dict()
         config['segmenter']['io'] = {
-            'raster_path': self.raster_path,
-            'boxes_path': self.boxes_path,
+            'coco_path': self.coco_path,
+            'input_tiles_root': self.input_tiles_root,
             'output_folder': self.output_folder
         }
