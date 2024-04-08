@@ -3,46 +3,69 @@ io:
     output_folder: './output/test/xprize'
     coco_n_workers: 5
 
-tilerizer:
-    tile_size: 1024
-    tile_overlap: 0.5
-    raster_resolution:
-        scale_factor: null
-        ground_resolution: 0.05
-    ignore_black_white_alpha_tiles_threshold: 0.8
-    area_of_interest: {
-        aoi_config: 'generate',
-        aoi_type: 'band',
-        aois: {
-          'infer': {
-            'percentage': 1.0,
-            'position': 1
-          }
+detector_config:
+    tilerizer:
+        tile_size: 1024
+        tile_overlap: 0.5
+        raster_resolution:
+            scale_factor: null
+            ground_resolution: 0.05
+        ignore_black_white_alpha_tiles_threshold: 0.8
+        area_of_interest: {
+            aoi_config: 'generate',
+            aoi_type: 'band',
+            aois: {
+              'infer': {
+                'percentage': 1.0,
+                'position': 1
+              }
+            }
         }
-    }
 
-detector:
-    infer:
-        io:
-            checkpoint_state_dict_path: './output/detector_quebec/detector_checkpoint.pt'
-        base_params:
-            batch_size: 25
-            box_predictions_per_image: 250
-        architecture:
-            architecture_name: 'basic'
-            rcnn_backbone_model_resnet_name: 'resnet50'
+    detector:
+        infer:
+            io:
+                checkpoint_state_dict_path: './output/detector_quebec/detector_checkpoint.pt'
+            base_params:
+                batch_size: 25
+                box_predictions_per_image: 250
+            architecture:
+                architecture_name: 'basic'
+                rcnn_backbone_model_resnet_name: 'resnet50'
 
-aggregator:
-    score_threshold: 0.4
-    nms_threshold: 0.7
-    nms_algorithm: 'iou'
+    aggregator:
+        score_threshold: 0.4
+        nms_threshold: 0.7
+        nms_algorithm: 'iou'
 
-segmenter:
-    model_type: 'vit_l'
-    checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
-    simplify_tolerance: 1.0
-    padding_percentage: 2.0
-    min_pixel_padding: 100
-    raster_resolution:
-        scale_factor: null
-        ground_resolution: 0.05
+segmenter_config:
+    tilerizer:
+        tile_size: 1024
+        tile_overlap: 0.5
+        raster_resolution:
+            scale_factor: null
+            ground_resolution: 0.05
+        ignore_black_white_alpha_tiles_threshold: 0.8
+        area_of_interest: {
+            aoi_config: 'generate',
+            aoi_type: 'band',
+            aois: {
+              'infer': {
+                'percentage': 1.0,
+                'position': 1
+              }
+            }
+        }
+
+    segmenter:
+        model_type: 'vit_l'
+        checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
+        simplify_tolerance: 1.0
+        padding_percentage: 2.0
+        min_pixel_padding: 100
+
+    aggregator:
+        score_threshold: 0.4
+        nms_threshold: 0.7
+        nms_algorithm: 'iou'
+
