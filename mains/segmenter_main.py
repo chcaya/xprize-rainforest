@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
+from geodataset.dataset import DetectionLabeledRasterCocoDataset
 from geodataset.utils import CocoNameConvention
 
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
@@ -22,16 +22,18 @@ def segmenter_infer_main(config: SegmenterInferIOConfig):
                                                            tiles_path.parent],
                                                 )
 
-    coco_output_path = CocoNameConvention.create_name(product_name=product_name,
+    coco_output_name = CocoNameConvention.create_name(product_name=product_name,
                                                       fold=f"{fold}segmenter",
                                                       scale_factor=scale_factor,
                                                       ground_resolution=ground_resolution)
+
+    coco_output_path = output_folder / coco_output_name
 
     sam = SamPredictorWrapper(model_type=config.model_type,
                               checkpoint_path=config.checkpoint_path,
                               simplify_tolerance=config.simplify_tolerance)
     sam.infer_on_multi_box_dataset(dataset=dataset,
-                                   coco_json_output_path=output_folder / coco_output_path
+                                   coco_json_output_path=coco_output_path
                                    )
 
     config.save_yaml_config(output_path=output_folder / "segmenter_infer_config.yaml")

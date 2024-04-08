@@ -13,17 +13,24 @@ class XPrizeIOConfig(BaseConfig):
     output_folder: str
     coco_n_workers: int
 
-    tilerizer_config: TilerizerConfig
+    detector_tilerizer_config: TilerizerConfig
     detector_infer_config: DetectorInferConfig
-    aggregator_config: AggregatorConfig
-    sam_infer_config: SegmenterInferConfig
+    detector_aggregator_config: AggregatorConfig
+    segmenter_tilerizer_config: TilerizerConfig
+    segmenter_infer_config: SegmenterInferConfig
+    segmenter_aggregator_config: AggregatorConfig
 
     @classmethod
     def from_dict(cls, config: dict):
-        tilerizer_config = TilerizerConfig.from_dict(config)
-        detector_infer_config = DetectorInferConfig.from_dict(config)
-        aggregator_config = AggregatorConfig.from_dict(config)
-        sam_infer_config = SegmenterInferConfig.from_dict(config)
+        detector_config = config['detector_config']
+        segmenter_config = config['segmenter_config']
+
+        detector_tilerizer_config = TilerizerConfig.from_dict(detector_config)
+        detector_infer_config = DetectorInferConfig.from_dict(detector_config)
+        detector_aggregator_config = AggregatorConfig.from_dict(detector_config)
+        segmenter_tilerizer_config = TilerizerConfig.from_dict(segmenter_config)
+        segmenter_infer_config = SegmenterInferConfig.from_dict(segmenter_config)
+        segmenter_aggregator_config = AggregatorConfig.from_dict(segmenter_config)
 
         xprize_io_config = config['io']
 
@@ -31,10 +38,12 @@ class XPrizeIOConfig(BaseConfig):
             raster_path=xprize_io_config['raster_path'],
             output_folder=xprize_io_config['output_folder'],
             coco_n_workers=xprize_io_config['coco_n_workers'],
-            tilerizer_config=tilerizer_config,
+            detector_tilerizer_config=detector_tilerizer_config,
             detector_infer_config=detector_infer_config,
-            aggregator_config=aggregator_config,
-            sam_infer_config=sam_infer_config
+            detector_aggregator_config=detector_aggregator_config,
+            segmenter_tilerizer_config=segmenter_tilerizer_config,
+            segmenter_infer_config=segmenter_infer_config,
+            segmenter_aggregator_config=segmenter_aggregator_config
         )
 
     def to_structured_dict(self):
@@ -44,10 +53,16 @@ class XPrizeIOConfig(BaseConfig):
                 'output_folder': self.output_folder,
                 'coco_n_workers': self.coco_n_workers,
             },
-            'tilerizer': self.tilerizer_config.to_structured_dict()['tilerizer'],
-            'detector': self.detector_infer_config.to_structured_dict()['detector'],
-            'aggregator': self.aggregator_config.to_structured_dict()['aggregator'],
-            'segmenter': self.sam_infer_config.to_structured_dict()['segmenter']
+            'detector_config': {
+                'tilerizer': self.detector_tilerizer_config.to_structured_dict()['tilerizer'],
+                'detector': self.detector_infer_config.to_structured_dict()['detector'],
+                'aggregator': self.detector_aggregator_config.to_structured_dict()['aggregator']
+            },
+            'segmenter_config': {
+                'tilerizer': self.segmenter_tilerizer_config.to_structured_dict()['tilerizer'],
+                'segmenter': self.segmenter_infer_config.to_structured_dict()['segmenter'],
+                'aggregator': self.segmenter_aggregator_config.to_structured_dict()['aggregator']
+            }
         }
 
         return config
