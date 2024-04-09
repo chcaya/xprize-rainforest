@@ -34,69 +34,103 @@ class XPrizePipeline:
 
     def run(self):
         # Creating tiles for the detector
-        detector_tilerizer_config = self._get_tilerizer_config(tilerizer_config=self.config.detector_tilerizer_config,
-                                                               output_folder=self.detector_tilerizer_output_folder,
-                                                               labels_path=None,
-                                                               main_label_category_column_name=None)
-        detector_tiles_path, _ = tilerizer_main(config=detector_tilerizer_config)
+        detector_tilerizer_config = self._get_tilerizer_config(
+            tilerizer_config=self.config.detector_tilerizer_config,
+            output_folder=self.detector_tilerizer_output_folder,
+            labels_path=None,
+            main_label_category_column_name=None
+        )
+        detector_tiles_path, _ = tilerizer_main(
+            config=detector_tilerizer_config
+        )
 
         # Detecting trees
         detector_config = self._get_detector_infer_config()
-        detector_coco_output_path = detector_infer_main(config=detector_config)
+        detector_coco_output_path = detector_infer_main(
+            config=detector_config
+        )
 
         # Aggregating detected trees
-        detector_aggregator_config = self._get_aggregator_config(aggregator_config=self.config.detector_aggregator_config,
-                                                                 tiles_path=detector_tiles_path,
-                                                                 coco_path=detector_coco_output_path,
-                                                                 output_path=self.detector_aggregator_output_folder)
-        detector_aggregator_output_file = aggregator_main(config=detector_aggregator_config)
+        detector_aggregator_config = self._get_aggregator_config(
+            aggregator_config=self.config.detector_aggregator_config,
+            tiles_path=detector_tiles_path,
+            coco_path=detector_coco_output_path,
+            output_path=self.detector_aggregator_output_folder
+        )
+        detector_aggregator_output_file = aggregator_main(
+            config=detector_aggregator_config
+        )
 
         # Converting aggregated trees from coco to geojson
-        coco_to_geojson_config = self._get_coco_to_geojson_config(input_tiles_root=detector_tiles_path,
-                                                                  coco_path=detector_aggregator_output_file,
-                                                                  output_folder=self.detector_aggregator_output_folder)
-        _, detector_aggregator_geojson_path = coco_to_geojson_main(config=coco_to_geojson_config)
+        coco_to_geojson_config = self._get_coco_to_geojson_config(
+            input_tiles_root=detector_tiles_path,
+            coco_path=detector_aggregator_output_file,
+            output_folder=self.detector_aggregator_output_folder
+        )
+        _, detector_aggregator_geojson_path = coco_to_geojson_main(
+            config=coco_to_geojson_config
+        )
 
         if asdict(self.config.detector_tilerizer_config) == asdict(self.config.segmenter_tilerizer_config):
             # The tilerizer configs are the same for the detector and the segmenter, so no need to re-tilerize and re-run the aggregator.
             print("Skipping the segmenter tilerizer as the detector and segmenter tilerizer configs are the same.")
 
             # Predicting tree instance segmentations
-            segmenter_config = self._get_segmenter_infer_config(tiles_path=detector_tiles_path,
-                                                                coco_path=detector_aggregator_output_file)
-            segmenter_final_output_file = segmenter_infer_main(config=segmenter_config)
+            segmenter_config = self._get_segmenter_infer_config(
+                tiles_path=detector_tiles_path,
+                coco_path=detector_aggregator_output_file
+            )
+            segmenter_final_output_file = segmenter_infer_main(
+                config=segmenter_config
+            )
 
             print("Skipping the segmenter aggregator as the detector and segmenter tilerizer configs are the same.")
             segmenter_final_tiles_path = detector_tiles_path
 
         else:
             # Creating tiles for the segmenter as the tilerizer configs are different for the detector and segmenter
-            segmenter_tilerizer_config = self._get_tilerizer_config(tilerizer_config=self.config.segmenter_tilerizer_config,
-                                                                    output_folder=self.segmenter_tilerizer_output_folder,
-                                                                    labels_path=detector_aggregator_geojson_path,
-                                                                    main_label_category_column_name=None  # TODO maybe change?
-                                                                    )
-            segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(config=segmenter_tilerizer_config)
+            # TODO add a boolean parameter to Tilerizer to avoid duplicating boxes/segments (for each box it should find out what is the appropriate tile based on tiles centroids and borders intersections)
+            segmenter_tilerizer_config = self._get_tilerizer_config(
+                tilerizer_config=self.config.segmenter_tilerizer_config,
+                output_folder=self.segmenter_tilerizer_output_folder,
+                labels_path=detector_aggregator_geojson_path,
+                main_label_category_column_name=None  # TODO maybe change?
+            )
+            segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(
+                config=segmenter_tilerizer_config
+            )
             segmenter_coco_path = segmenter_coco_paths[list(self.config.segmenter_tilerizer_config.aois.keys())[0]]
 
             # Predicting tree instance segmentations
-            segmenter_config = self._get_segmenter_infer_config(tiles_path=segmenter_tiles_path,
-                                                                coco_path=segmenter_coco_path)
-            segmenter_output_file = segmenter_infer_main(config=segmenter_config)
+            segmenter_config = self._get_segmenter_infer_config(
+                tiles_path=segmenter_tiles_path,
+                coco_path=segmenter_coco_path
+            )
+            segmenter_output_file = segmenter_infer_main(
+                config=segmenter_config
+            )
 
             # Aggregating trees masks       # TODO currently the aggregator only works for BOXES and not SEGMENTATIONS
-            segmenter_aggregator_config = self._get_aggregator_config(aggregator_config=self.config.segmenter_aggregator_config,
-                                                                      tiles_path=segmenter_tiles_path,
-                                                                      coco_path=segmenter_output_file,
-                                                                      output_path=self.segmenter_aggregator_output_folder)
-            segmenter_final_output_file = aggregator_main(config=segmenter_aggregator_config)
+            segmenter_aggregator_config = self._get_aggregator_config(
+                aggregator_config=self.config.segmenter_aggregator_config,
+                tiles_path=segmenter_tiles_path,
+                coco_path=segmenter_output_file,
+                output_path=self.segmenter_aggregator_output_folder
+            )
+            segmenter_final_output_file = aggregator_main(
+                config=segmenter_aggregator_config
+            )
             segmenter_final_tiles_path = segmenter_tiles_path
 
         # Converting aggregated trees masks from coco to geojson
-        coco_to_geojson_config = self._get_coco_to_geojson_config(input_tiles_root=segmenter_final_tiles_path,
-                                                                  coco_path=segmenter_final_output_file,
-                                                                  output_folder=self.segmenter_aggregator_output_folder)
-        tree_segments_gdf, segmenter_aggregator_geojson_path = coco_to_geojson_main(config=coco_to_geojson_config)
+        coco_to_geojson_config = self._get_coco_to_geojson_config(
+            input_tiles_root=segmenter_final_tiles_path,
+            coco_path=segmenter_final_output_file,
+            output_folder=self.segmenter_aggregator_output_folder
+        )
+        tree_segments_gdf, segmenter_aggregator_geojson_path = coco_to_geojson_main(
+            config=coco_to_geojson_config
+        )
 
     def _get_tilerizer_config(self,
                               tilerizer_config: TilerizerConfig,
