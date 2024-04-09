@@ -22,7 +22,8 @@ def coco_to_geojson_main(config: CocoToGeojsonIOConfig):
     gdf = coco_to_geojson(
         coco_json_path=config.coco_path,
         images_directory=config.input_tiles_root,
-        geojson_output_path=str(geojson_output_path)
+        convert_to_crs_coordinates=True,
+        geojson_output_path=str(geojson_output_path),
     )
 
     return gdf, geojson_output_path
