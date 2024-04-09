@@ -1,0 +1,8 @@
+embedder:
+  infer:
+    io:
+      input_tiles_root: ''
+      coco_path: ''
+      output_folder: ''
+    dino_v2:
+      size: large
