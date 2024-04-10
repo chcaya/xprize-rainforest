@@ -17,7 +17,7 @@ def dino_v2_infer_main(config: DINOv2InferConfig, segmentation_dataset: Segmenta
 
 def embedder_infer_main(config: EmbedderInferIOConfig):
     output_folder = Path(config.output_folder)
-    output_folder.mkdir(exist_ok=False, parents=True)
+    output_folder.mkdir(exist_ok=True, parents=True)        # TODO change exist_ok back to False
 
     product_name, scale_factor, ground_resolution, fold = CocoNameConvention.parse_name(Path(config.coco_path).name)
 
@@ -33,8 +33,13 @@ def embedder_infer_main(config: EmbedderInferIOConfig):
         fold=fold
     )
 
-    if isinstance(config, DINOv2InferIOConfig):
-        embeddings = dino_v2_infer_main(config=config, segmentation_dataset=segmentation_dataset)
+    if isinstance(config, DINOv2InferConfig):
+        embeddings_df = dino_v2_infer_main(config=config, segmentation_dataset=segmentation_dataset)
+    else:
+        raise NotImplementedError
+
+    output_path = output_folder / "embeddings.csv"
+    embeddings_df.to_csv(output_path, index=False)
 
     config.save_yaml_config(output_path=output_folder / "embedder_infer_config.yaml")
 
