@@ -1,5 +1,7 @@
 embedder:
   infer:
+    pca_n_features: 100
+    pca_n_patches: 1000000
     io:
       input_tiles_root: ''
       coco_path: ''

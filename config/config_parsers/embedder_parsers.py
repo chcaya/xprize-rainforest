@@ -5,12 +5,32 @@ from config.config_parsers.base_config_parsers import BaseConfig
 
 @dataclass
 class EmbedderInferConfig(BaseConfig):
+    pca_n_features: int
+    pca_n_patches: int
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        embedder_infer_config = config['embedder']['infer']
+        return cls(
+            pca_n_features=embedder_infer_config['pca_n_features'],
+            pca_n_patches=embedder_infer_config['pca_n_patches'],
+        )
+
     def to_structured_dict(self) -> dict:
-        pass
+        config = {
+            'embedder': {
+                'infer': {
+                    'pca_n_features': self.pca_n_features,
+                    'pca_n_patches': self.pca_n_patches,
+                }
+            }
+        }
+
+        return config
 
 
 @dataclass
-class EmbedderInferIOConfig(EmbedderInferConfig):
+class EmbedderInferIOConfig(BaseConfig):
     input_tiles_root: str
     coco_path: str
     output_folder: str
@@ -26,11 +46,16 @@ class EmbedderInferIOConfig(EmbedderInferConfig):
         )
 
     def to_structured_dict(self):
-        config = super().to_structured_dict()
-        config['embedder']['infer']['io'] = {
-            'input_tiles_root': self.input_tiles_root,
-            'coco_path': self.coco_path,
-            'output_folder': self.output_folder,
+        config = {
+            'embedder': {
+                'infer': {
+                    'io': {
+                        'input_tiles_root': self.input_tiles_root,
+                        'coco_path': self.coco_path,
+                        'output_folder': self.output_folder
+                    }
+                }
+            }
         }
 
         return config
@@ -42,20 +67,19 @@ class DINOv2InferConfig(EmbedderInferConfig):
 
     @classmethod
     def from_dict(cls, config: dict):
+        parent_config = EmbedderInferConfig.from_dict(config)
         embedder_infer_config = config['embedder']['infer']
         dino_v2_config = embedder_infer_config['dino_v2']
 
         return cls(
+            **parent_config.as_dict(),
             size=dino_v2_config['size'],
         )
 
     def to_structured_dict(self):
-        config = {
-            'embedder': {
-                'dino_v2': {
-                    'size': self.size,
-                }
-            }
+        config = super().to_structured_dict()
+        config['embedder']['infer']['dino_v2'] = {
+            'size': self.size
         }
 
         return config
