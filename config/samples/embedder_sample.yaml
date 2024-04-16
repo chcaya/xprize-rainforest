@@ -1,5 +1,8 @@
 embedder:
   infer:
+    batch_size: 4
+    use_pca: false
+    pca_model_path: './output/test/embedder_test_disambiguate/pca_model_dinov2_small.pkl'   # will be loaded if it exists, or will fit a PCA model and save it if not
     pca_n_features: 100
     pca_n_patches: 1000000
     io:

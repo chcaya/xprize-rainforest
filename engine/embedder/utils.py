@@ -1,8 +1,11 @@
+from pathlib import Path
+
+import joblib
 import numpy as np
 from sklearn.decomposition import PCA
 
 
-def apply_pca_to_images(embeddings: np.ndarray, n_patches: int, n_features: int):
+def apply_pca_to_images(embeddings: np.ndarray, pca_model_path: str, n_patches: int, n_features: int):
     n, h, w, d = embeddings.shape
     embeddings_array_flat = embeddings.reshape(-1, embeddings.shape[-1])
     if n_patches > embeddings_array_flat.shape[0]:
@@ -12,9 +15,17 @@ def apply_pca_to_images(embeddings: np.ndarray, n_patches: int, n_features: int)
     random_indices = np.random.choice(embeddings_array_flat.shape[0], size=n_patches, replace=False)
     selected_patches = embeddings_array_flat[random_indices]
 
-    pca = PCA(n_components=n_features)
     print(f"Computing PCA with n_features={n_features} and n_patches={n_patches}...")
-    pca.fit(selected_patches)
+    if Path(pca_model_path).exists():
+        print(f"Loading PCA model from {pca_model_path}.")
+        pca = joblib.load(pca_model_path)
+    else:
+        print("Fitting new PCA model...")
+        pca = PCA(n_components=n_features)
+        pca.fit(selected_patches)
+        Path(pca_model_path).parent.mkdir(parents=True, exist_ok=True)
+        print(f"Saving new PCA model to {pca_model_path}.")
+        joblib.dump(pca, pca_model_path)
     print(f"Done. Reducing dimensionality from {d} to {n_features} for all images...")
     pca_result = pca.transform(embeddings_array_flat)
     pca_result = pca_result.reshape(n, h, w, n_features)

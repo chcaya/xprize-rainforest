@@ -6,7 +6,8 @@ from geodataset.utils import TileNameConvention, CocoNameConvention, COCOGenerat
 
 from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, \
     DetectorInferIOConfig
-from engine.detector.utils import collate_fn_detection, collate_fn_images, detector_result_to_lists
+from engine.detector.utils import detector_result_to_lists
+from engine.utils.utils import collate_fn_detection, collate_fn_images
 from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorScorePipeline, DetectorInferencePipeline
 
 
