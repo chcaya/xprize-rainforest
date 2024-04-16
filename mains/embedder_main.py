@@ -38,7 +38,7 @@ def embedder_infer_main(config: EmbedderInferIOConfig):
     else:
         raise NotImplementedError
 
-    output_path = output_folder / "embeddings.csv"
+    output_path = output_folder / f"{product_name}_embeddings_{fold}.csv"
     embeddings_df.to_csv(output_path, index=False)
 
     config.save_yaml_config(output_path=output_folder / "embedder_infer_config.yaml")

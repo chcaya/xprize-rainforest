@@ -5,6 +5,9 @@ from config.config_parsers.base_config_parsers import BaseConfig
 
 @dataclass
 class EmbedderInferConfig(BaseConfig):
+    batch_size: int
+    use_pca: bool
+    pca_model_path: str
     pca_n_features: int
     pca_n_patches: int
 
@@ -12,6 +15,9 @@ class EmbedderInferConfig(BaseConfig):
     def from_dict(cls, config: dict):
         embedder_infer_config = config['embedder']['infer']
         return cls(
+            batch_size=embedder_infer_config['batch_size'],
+            use_pca=embedder_infer_config['use_pca'],
+            pca_model_path=embedder_infer_config['pca_model_path'],
             pca_n_features=embedder_infer_config['pca_n_features'],
             pca_n_patches=embedder_infer_config['pca_n_patches'],
         )
@@ -20,6 +26,9 @@ class EmbedderInferConfig(BaseConfig):
         config = {
             'embedder': {
                 'infer': {
+                    'batch_size': self.batch_size,
+                    'use_pca': self.use_pca,
+                    'pca_model_path': self.pca_model_path,
                     'pca_n_features': self.pca_n_features,
                     'pca_n_patches': self.pca_n_patches,
                 }

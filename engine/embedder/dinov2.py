@@ -1,6 +1,7 @@
 import itertools
 import math
 import time
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -8,15 +9,15 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as tvf
 from einops import einops
-from matplotlib import pyplot as plt
+from scipy import sparse
 from skimage.measure import block_reduce
-from sklearn.decomposition import PCA
 from tqdm import tqdm
 
 from geodataset.dataset import SegmentationLabeledRasterCocoDataset
 
 from config.config_parsers.embedder_parsers import DINOv2InferConfig
 from engine.embedder.utils import apply_pca_to_images
+from engine.utils.utils import collate_fn_segmentation
 
 
 class DINOv2Preprocessor:
@@ -33,8 +34,7 @@ class DINOv2Preprocessor:
         pad_size_right = pad_size - pad_size_left
         return pad_size_left, pad_size_right
 
-    def preprocess(self, x: np.ndarray):
-        x = torch.Tensor(x).unsqueeze(0)  # instead of unsqueeze, add support for batches
+    def preprocess(self, x: torch.Tensor):
         x = tvf.normalize(x, mean=list(self.MEAN), std=list(self.STD))
         pads = list(itertools.chain.from_iterable(self._get_pad(m) for m in x.shape[:1:-1]))
         x = F.pad(x, pads)
@@ -67,11 +67,11 @@ class DINOv2Inference:
 
         return torch.hub.load('facebookresearch/dinov2', model_name, pretrained=True).to(self.device)
 
-    def __call__(self, x: np.ndarray):
+    def __call__(self, x: torch.Tensor):
         with torch.inference_mode():
             pp_x, pads, num_h_patches, num_w_patches = self.preprocessor.preprocess(x)
-
             pp_x = pp_x.to(self.device)
+
             output = self.model(pp_x, is_training=True)
             output = output['x_norm_patchtokens']
 
@@ -86,47 +86,59 @@ class DINOv2Inference:
             return output_pp, pads
 
     def infer_on_segmentation_dataset(self, dataset: SegmentationLabeledRasterCocoDataset):
+        data_loader = torch.utils.data.DataLoader(dataset,
+                                                  batch_size=self.config.batch_size,
+                                                  num_workers=3,
+                                                  collate_fn=collate_fn_segmentation)
+
         dfs = []
-        down_sampled_masks_list = []
         embeddings_list = []
-        tqdm_dataset = tqdm(dataset, desc="Inferring DINOv2...")
+        down_sampled_masks_list = []
+        tqdm_dataset = tqdm(data_loader, desc="Inferring DINOv2...")
         for i, x in enumerate(tqdm_dataset):
-            image = x[0]
+            images = x[0]
             labels = x[1]
 
-            embeddings, pads = self(image)
+            embeddings, image_pads = self(images)
+            for j, label in enumerate(labels):
+                image_masks = label['masks']
+                image_masks = image_masks.cpu().detach().numpy()
 
-            masks = labels['masks']
-            masks = np.stack(masks, axis=0)
-            # Applying padding to the masks
-            pads = ((0, 0), (pads[0], pads[1]), (pads[2], pads[3]))
-            masks = np.pad(masks, pads, mode='constant', constant_values=0)
+                masks = np.stack(image_masks, axis=0)
 
-            down_sampled_masks = block_reduce(
-                masks,
-                block_size=(1, self.vit_patch_size, self.vit_patch_size),
-                func=np.mean
-            )
+                # Applying padding to the masks
+                masks_pads = ((0, 0), (image_pads[0], image_pads[1]), (image_pads[2], image_pads[3]))
+                image_masks = np.pad(masks, masks_pads, mode='constant', constant_values=0)
 
-            df = pd.DataFrame({'labels': labels['labels'],
-                               'area': labels['area'],
-                               'iscrowd': labels['iscrowd']})
-            df['image_id'] = labels['image_id'][0]
-            df['image_path'] = dataset.tiles[labels['image_id'][0]]['path']
+                down_sampled_masks = block_reduce(
+                    image_masks,
+                    block_size=(1, self.vit_patch_size, self.vit_patch_size),
+                    func=np.mean
+                )
 
-            dfs.append(df)
-            embeddings_list.append(embeddings.squeeze(0))
-            down_sampled_masks_list.append(down_sampled_masks)
+                down_sampled_masks_list.append(down_sampled_masks)
+                embeddings_list.append(embeddings[j])
+
+                df = pd.DataFrame({
+                    'labels': label['labels'].numpy().tolist(),
+                    'area': label['area'].numpy().tolist(),
+                    'iscrowd': label['iscrowd'].numpy().tolist(),
+                    'image_id': [int(label['image_id'][0])] * len(label['labels']),
+                    'image_path': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels']),
+                })
+                dfs.append(df)
 
         stacked_embeddings = np.stack(embeddings_list, axis=0)
-        reduced_stacked_embeddings = apply_pca_to_images(
-            stacked_embeddings,
-            n_patches=self.config.pca_n_patches,
-            n_features=self.config.pca_n_features
-        )
+        if self.config.use_pca:
+            stacked_embeddings = apply_pca_to_images(
+                stacked_embeddings,
+                pca_model_path=self.config.pca_model_path,
+                n_patches=self.config.pca_n_patches,                        # TODO I should save the pca model (fit with train fold) to then use it for valid, test !!! It really breaks results if not
+                n_features=self.config.pca_n_features
+            )
 
         print("Computing embeddings for each mask...")
-        for df, down_sampled_masks, reduced_embeddings in zip(dfs, down_sampled_masks_list, reduced_stacked_embeddings):
+        for df, down_sampled_masks, reduced_embeddings in zip(dfs, down_sampled_masks_list, stacked_embeddings):        # TODO this is really slow, should be parallelized
             down_sampled_masks_patches_embeddings = reduced_embeddings * down_sampled_masks[:, :, :, np.newaxis]
             down_sampled_masks_embeddings = np.sum(down_sampled_masks_patches_embeddings, axis=(1, 2))
 
@@ -136,6 +148,7 @@ class DINOv2Inference:
             non_zero_patches_mean = down_sampled_masks_embeddings / non_zero_count[:, np.newaxis]
 
             df['embeddings'] = non_zero_patches_mean.tolist()
+            df['down_sampled_masks'] = down_sampled_masks.tolist()
 
         final_df = pd.concat(dfs)
 
