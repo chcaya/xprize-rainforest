@@ -137,8 +137,11 @@ class DINOv2Inference:
                 n_features=self.config.pca_n_features
             )
 
-        print("Computing embeddings for each mask...")
-        for df, down_sampled_masks, reduced_embeddings in zip(dfs, down_sampled_masks_list, stacked_embeddings):        # TODO this is really slow, should be parallelized
+        for df, down_sampled_masks, reduced_embeddings in tqdm(
+                zip(dfs, down_sampled_masks_list, stacked_embeddings),
+                desc="Computing embeddings for each image masks...",
+                total=len(dfs)
+                ):                              # TODO this is really slow, should be parallelized
             down_sampled_masks_patches_embeddings = reduced_embeddings * down_sampled_masks[:, :, :, np.newaxis]
             down_sampled_masks_embeddings = np.sum(down_sampled_masks_patches_embeddings, axis=(1, 2))
 
