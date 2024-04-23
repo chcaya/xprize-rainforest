@@ -19,6 +19,10 @@ def apply_pca_to_images(embeddings: np.ndarray, pca_model_path: str, n_patches: 
     if Path(pca_model_path).exists():
         print(f"Loading PCA model from {pca_model_path}.")
         pca = joblib.load(pca_model_path)
+        assert pca.n_components == n_features, \
+            f"PCA model has {pca.n_components} components, but config specified {n_features}."
+        assert embeddings.shape[-1] == pca.n_features_in_, \
+            f"PCA model was trained with {pca.n_features_in_} input features, but input has {embeddings.shape[-1]}."
     else:
         print("Fitting new PCA model...")
         pca = PCA(n_components=n_features)
