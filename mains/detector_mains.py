@@ -105,7 +105,7 @@ def detector_infer_main(config: DetectorInferIOConfig):
                                    output_path=coco_output_path,
                                    use_rle_for_labels=True,
                                    n_workers=config.coco_n_workers,
-                                   main_label_category_to_id_map=None)
+                                   coco_categories_list=None)
     coco_generator.generate_coco()
 
     config.save_yaml_config(output_path=output_folder / "detector_infer_config.yaml")

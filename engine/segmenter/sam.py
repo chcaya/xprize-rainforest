@@ -99,6 +99,6 @@ class SamPredictorWrapper:
             output_path=coco_json_output_path,
             use_rle_for_labels=True,  # TODO make this a parameter to the class
             n_workers=5,  # TODO make this a parameter to the class
-            main_label_category_to_id_map=None  # TODO make this a parameter to the class
+            coco_categories_list=None  # TODO make this a parameter to the class
         )
         coco_generator.generate_coco()

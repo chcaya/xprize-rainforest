@@ -10,6 +10,7 @@ from config.config_parsers.detector_parsers import DetectorInferIOConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from config.config_parsers.tilerizer_parsers import TilerizerIOConfig, TilerizerConfig
 from config.config_parsers.xprize_parsers import XPrizeIOConfig
+from engine.embedder.siamese.siamese_infer import siamese_classifier
 from mains import tilerizer_main
 from mains.aggregator_main import aggregator_main
 from mains.coco_to_geojson_main import coco_to_geojson_main
@@ -80,12 +81,11 @@ class XPrizePipeline:
                 tiles_path=detector_tiles_path,
                 coco_path=detector_aggregator_output_file
             )
-            segmenter_final_output_file = segmenter_infer_main(
+            segmenter_output_file = segmenter_infer_main(
                 config=segmenter_config
             )
 
-            print("Skipping the segmenter aggregator as the detector and segmenter tilerizer configs are the same.")
-            segmenter_final_tiles_path = detector_tiles_path
+            segmenter_tiles_path = detector_tiles_path
 
         else:
             # Creating tiles for the segmenter as the tilerizer configs are different for the detector and segmenter
@@ -110,26 +110,32 @@ class XPrizePipeline:
                 config=segmenter_config
             )
 
-            # Aggregating trees masks       # TODO currently the aggregator only works for BOXES and not SEGMENTATIONS
-            segmenter_aggregator_config = self._get_aggregator_config(
-                aggregator_config=self.config.segmenter_aggregator_config,
-                tiles_path=segmenter_tiles_path,
-                coco_path=segmenter_output_file,
-                output_path=self.segmenter_aggregator_output_folder
-            )
-            segmenter_final_output_file = aggregator_main(
-                config=segmenter_aggregator_config
-            )
-            segmenter_final_tiles_path = segmenter_tiles_path
+        # Aggregating trees masks       # TODO change the Aggregator logic for segmentations, as it should merge the intersections etc
+        segmenter_aggregator_config = self._get_aggregator_config(
+            aggregator_config=self.config.segmenter_aggregator_config,
+            tiles_path=segmenter_tiles_path,
+            coco_path=segmenter_output_file,
+            output_path=self.segmenter_aggregator_output_folder
+        )
+        segmenter_final_output_file = aggregator_main(
+            config=segmenter_aggregator_config
+        )
 
         # Converting aggregated trees masks from coco to geojson
         coco_to_geojson_config = self._get_coco_to_geojson_config(
-            input_tiles_root=segmenter_final_tiles_path,
+            input_tiles_root=segmenter_tiles_path,
             coco_path=segmenter_final_output_file,
             output_folder=self.segmenter_aggregator_output_folder
         )
         tree_segments_gdf, segmenter_aggregator_geojson_path = coco_to_geojson_main(
             config=coco_to_geojson_config
+        )
+
+        # TODO tilerize with PolygonTilerizer
+
+        siamese_classifier(
+            data_roots=[segmenter_final_output_file.parent, segmenter_tiles_path],
+            fold='' # TODO
         )
 
     def _get_tilerizer_config(self,

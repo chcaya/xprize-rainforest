@@ -188,7 +188,7 @@ if __name__ == "__main__":
     model = Classifier(input_size=1024, num_classes=len(np.unique(y_train)), label_map=train_label_map).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  # Decays the learning rate by a factor of 0.1 every 10 epochs
+    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  # Decays the learning rate by a factor of 0.1 every 10 epochs       # TODO this is probably too much decay at one time
 
     # Directory for saving model checkpoints
     print("Creating output directory...")
