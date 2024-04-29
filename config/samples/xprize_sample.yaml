@@ -69,3 +69,30 @@ segmenter_config:
         nms_threshold: 0.7
         nms_algorithm: 'iou'
 
+classifier_config:
+    tilerizer:
+        tile_type: 'polygon'
+        tile_size: 1024
+        tile_overlap: null
+        raster_resolution:
+            scale_factor: null
+            ground_resolution: 0.05
+        ignore_black_white_alpha_tiles_threshold: null
+        area_of_interest: {
+            aoi_config: 'generate',
+            aoi_type: 'band',
+            aois: {
+              'infer': {
+                'percentage': 1.0,
+                'position': 1
+              }
+            }
+        }
+
+    embedder:
+        model_type: 'siamese'
+        checkpoint_path: 'C:/Users/Hugo/Documents/Data/models/sam/sam_siamese_0b3195.pth'
+
+    classifier:
+        model_type: 'svm'
+        checkpoint_path: 'C:/Users/Hugo/Documents/Data/models/sam/sam_svm_0b3195.pkl'
