@@ -13,8 +13,8 @@ from tqdm import tqdm
 
 from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, DetectorInferIOConfig
 from engine.detector.model import Detector
+from engine.detector.transforms import detector_transforms
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
-
 
 class DetectorBasePipeline(ABC):
     def __init__(self,
@@ -200,19 +200,8 @@ class DetectorTrainPipeline(DetectorScorePipeline):
 
     @staticmethod
     def get_data_augmentation_transform():
-        data_augmentation_transform = A.Compose([
-            A.HorizontalFlip(),
-            A.VerticalFlip(),
-            # A.ShiftScaleRotate(p=0.2),        # this can put boxes out of the image and then the training crashes on an image without boxes
-
-            A.RandomBrightnessContrast(p=0.1),
-            A.HueSaturationValue(hue_shift_limit=10, p=0.1),
-            A.RGBShift(p=0.1),
-            A.RandomGamma(p=0.1),
-            A.Blur(p=0.1),
-            A.ToGray(p=0.02),
-            A.ToSepia(p=0.02),
-        ],
+        data_augmentation_transform = A.Compose(
+            detector_transforms,
             bbox_params=A.BboxParams(
                 format='pascal_voc',  # Specify the format of your bounding boxes
                 label_fields=['labels'],  # Specify the field that contains the labels
