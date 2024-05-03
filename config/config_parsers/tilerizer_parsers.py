@@ -23,6 +23,7 @@ class RasterResolutionConfig(BaseIntermediateConfig):
 
 @dataclass
 class TilerizerConfig(BaseConfig):
+    tile_type: str
     tile_size: int
     tile_overlap: float
     raster_resolution_config: RasterResolutionConfig
@@ -40,6 +41,7 @@ class TilerizerConfig(BaseConfig):
         raster_resolution_config = RasterResolutionConfig.from_dict(tilerizer_config['raster_resolution'])
 
         return cls(
+            tile_type=tilerizer_config['tile_type'],
             tile_size=tilerizer_config['tile_size'],
             tile_overlap=tilerizer_config['tile_overlap'],
             raster_resolution_config=raster_resolution_config,
@@ -52,6 +54,7 @@ class TilerizerConfig(BaseConfig):
     def to_structured_dict(self):
         config = {
             'tilerizer': {
+                'tile_type': self.tile_type,
                 'tile_size': self.tile_size,
                 'tile_overlap': self.tile_overlap,
                 'raster_resolution_config': self.raster_resolution_config.to_structured_dict(),

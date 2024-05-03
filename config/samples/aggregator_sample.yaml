@@ -6,3 +6,4 @@ aggregator:
     score_threshold: 0.4
     nms_threshold: 0.7
     nms_algorithm: 'iou'
+    polygon_type: 'box'     # or 'segmentation'

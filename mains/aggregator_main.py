@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from geodataset.aggregator import DetectionAggregator
+from geodataset.aggregator import Aggregator
 from geodataset.utils import CocoNameConvention
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
@@ -18,12 +18,13 @@ def aggregator_main(config: AggregatorIOConfig):
                                                       ground_resolution=ground_resolution)
 
     aggregator_output_file = Path(config.output_folder) / coco_output_path
-    DetectionAggregator.from_coco(output_path=aggregator_output_file,
-                                  coco_json_path=Path(config.coco_path),
-                                  tiles_folder_path=Path(config.input_tiles_root),
-                                  score_threshold=config.score_threshold,
-                                  nms_threshold=config.nms_threshold,
-                                  nms_algorithm=config.nms_algorithm)
+    Aggregator.from_coco(polygon_type=config.polygon_type,
+                         output_path=aggregator_output_file,
+                         coco_json_path=Path(config.coco_path),
+                         tiles_folder_path=Path(config.input_tiles_root),
+                         score_threshold=config.score_threshold,
+                         nms_threshold=config.nms_threshold,
+                         nms_algorithm=config.nms_algorithm)
 
     config.save_yaml_config(output_path=output_folder / "aggregator_config.yaml")
 

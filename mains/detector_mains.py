@@ -1,4 +1,3 @@
-import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -7,7 +6,8 @@ from geodataset.utils import TileNameConvention, CocoNameConvention, COCOGenerat
 
 from config.config_parsers.detector_parsers import DetectorTrainIOConfig, DetectorScoreIOConfig, \
     DetectorInferIOConfig
-from engine.detector.utils import collate_fn_detection, collate_fn_images, detector_result_to_lists
+from engine.detector.utils import detector_result_to_lists
+from engine.utils.utils import collate_fn_detection, collate_fn_images
 from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorScorePipeline, DetectorInferencePipeline
 
 
@@ -105,7 +105,7 @@ def detector_infer_main(config: DetectorInferIOConfig):
                                    output_path=coco_output_path,
                                    use_rle_for_labels=True,
                                    n_workers=config.coco_n_workers,
-                                   main_label_category_to_id_map=None)
+                                   coco_categories_list=None)
     coco_generator.generate_coco()
 
     config.save_yaml_config(output_path=output_folder / "detector_infer_config.yaml")

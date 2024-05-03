@@ -8,6 +8,7 @@ class AggregatorConfig(BaseConfig):
     score_threshold: float
     nms_threshold: float
     nms_algorithm: str
+    polygon_type: str
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -15,7 +16,8 @@ class AggregatorConfig(BaseConfig):
         return cls(
             score_threshold=aggregator_config['score_threshold'],
             nms_threshold=aggregator_config['nms_threshold'],
-            nms_algorithm=aggregator_config['nms_algorithm']
+            nms_algorithm=aggregator_config['nms_algorithm'],
+            polygon_type=aggregator_config['polygon_type']
         )
 
     def to_structured_dict(self):
@@ -23,7 +25,8 @@ class AggregatorConfig(BaseConfig):
             'aggregator': {
                 'score_threshold': self.score_threshold,
                 'nms_threshold': self.nms_threshold,
-                'nms_algorithm': self.nms_algorithm
+                'nms_algorithm': self.nms_algorithm,
+                'polygon_type': self.polygon_type
             }
         }
 

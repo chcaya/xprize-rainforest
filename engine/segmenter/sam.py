@@ -6,8 +6,9 @@ import torch
 from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
 from geodataset.utils import apply_affine_transform, COCOGenerator
 from geopandas import GeoDataFrame
-import rasterio
+
 from segment_anything import SamPredictor, sam_model_registry
+
 from shapely.affinity import translate
 from tqdm import tqdm
 
@@ -31,11 +32,12 @@ class SamPredictorWrapper:
         self.predictor.set_image(image)
         box_array = np.array(boxes)
         box_tensor = torch.Tensor(box_array).to(self.device)
-        masks, _, _ = self.predictor.predict_torch(point_coords=None,
-                                                   point_labels=None,
-                                                   boxes=box_tensor,
-                                                   multimask_output=False)
-        return masks
+        masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
+                                                                    point_labels=None,
+                                                                    boxes=box_tensor,
+                                                                    multimask_output=False)
+
+        return masks, scores
 
     def infer_on_single_box_dataset(self, boxes_dataset: BoxesDataset, geojson_output_path: str):
         mask_polygons = []
@@ -67,12 +69,14 @@ class SamPredictorWrapper:
                                      leave=True)
         tiles_paths = []
         tiles_masks = []
+        tiles_scores = []
         for tile_idx, (image, boxes_data) in enumerate(dataset_with_progress):
             image = image[:3, :, :]
             image_hwc = image.transpose((1, 2, 0))
             image_hwc = (image_hwc * 255).astype(np.uint8)
-            masks = self._infer(image=image_hwc, boxes=boxes_data['boxes'])
+            masks, scores = self._infer(image=image_hwc, boxes=boxes_data['boxes'])
             masks = masks.cpu().numpy()
+            scores = scores.cpu().numpy()
             masks_polygons = [mask_to_polygon(mask.squeeze(), simplify_tolerance=self.simplify_tolerance) for mask
                               in masks]
             adjusted_masks_polygons = [translate(mask_polygon, xoff=0, yoff=0) for mask_polygon in masks_polygons]
@@ -80,16 +84,21 @@ class SamPredictorWrapper:
             tiles_paths.append(dataset.tiles[tile_idx]['path'])
             tiles_masks.append(adjusted_masks_polygons)
 
+            scores_pp = scores.squeeze().tolist()
+            if isinstance(scores_pp, float):
+                scores_pp = [scores_pp]
+            tiles_scores.append(scores_pp)
+
         coco_generator = COCOGenerator(
             description=f"Aggregated boxes from multiple tiles.",
             tiles_paths=tiles_paths,
             polygons=tiles_masks,
-            scores=None,  # TODO add support for scores
+            scores=tiles_scores,
             categories=None,  # TODO add support for categories
             other_attributes=None,  # TODO add support for other_attributes
             output_path=coco_json_output_path,
             use_rle_for_labels=True,  # TODO make this a parameter to the class
             n_workers=5,  # TODO make this a parameter to the class
-            main_label_category_to_id_map=None  # TODO make this a parameter to the class
+            coco_categories_list=None  # TODO make this a parameter to the class
         )
         coco_generator.generate_coco()
