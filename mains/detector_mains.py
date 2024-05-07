@@ -1,6 +1,7 @@
 from collections import defaultdict
 from pathlib import Path
 
+import torch
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 from geodataset.utils import TileNameConvention, CocoNameConvention, COCOGenerator
 
@@ -91,6 +92,10 @@ def detector_infer_main(config: DetectorInferIOConfig):
     inferer = DetectorInferencePipeline.from_config(config)
     detector_result = inferer.infer(infer_ds=infer_ds, collate_fn=collate_fn_images)
     boxes, scores = detector_result_to_lists(detector_result)
+
+    # making sure the model is released from memory
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.empty_cache()
 
     coco_output_path = output_folder / f'{coco_output_name}'
 

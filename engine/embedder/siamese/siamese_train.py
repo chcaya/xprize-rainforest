@@ -21,7 +21,7 @@ from geodataset.dataset.polygon_dataset import SiameseSamplerDataset, SiameseSam
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
 
 
-def infer_model(model, dataloader):
+def infer_model(model, dataloader, device):
     all_labels = []
     all_embeddings = []
 
@@ -74,8 +74,8 @@ def train(model, data_loader, valid_train_loader, valid_valid_loader, criterion,
                 print(f'Validating for step {overall_step}...')
                 model.eval()
                 with torch.no_grad():
-                    train_labels, train_embeddings = infer_model(model, valid_train_loader)
-                    valid_labels, valid_embeddings = infer_model(model, valid_valid_loader)
+                    train_labels, train_embeddings = infer_model(model, valid_train_loader, device)
+                    valid_labels, valid_embeddings = infer_model(model, valid_valid_loader, device)
 
                     train_to_delete = train_labels == -1
                     valid_to_delete = valid_labels == -1
