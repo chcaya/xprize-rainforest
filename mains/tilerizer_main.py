@@ -42,6 +42,7 @@ def tilerizer_main(config: TilerizerIOConfig):
 
             tilerizer.generate_tiles()
             coco_paths = None
+        tiles_path = tilerizer.tiles_path
     elif config.tile_type == 'polygon':
         tilerizer = PolygonTilerizer(
             raster_path=Path(config.raster_path),
@@ -53,11 +54,12 @@ def tilerizer_main(config: TilerizerIOConfig):
             ground_resolution=config.raster_resolution_config.ground_resolution,
         )
         coco_paths = tilerizer.generate_coco_dataset()
+        tiles_path = tilerizer.tiles_folder_path
     else:
         raise ValueError(f"Invalid tile type: {config.tile_type}. Expected 'tile' or 'polygon'.")
 
     config.save_yaml_config(output_path=output_folder / "tilerizer_config.yaml")
 
-    return tilerizer.tiles_path, coco_paths
+    return tiles_path, coco_paths
 
 
