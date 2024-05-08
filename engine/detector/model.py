@@ -1,5 +1,5 @@
 from torch import nn
-from torchvision.models import ResNet50_Weights, ResNet101_Weights
+from torchvision.models import ResNet50_Weights, ResNet101_Weights, ResNet152_Weights
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
@@ -41,6 +41,9 @@ def get_basic_faster_rcnn(rcnn_backbone_model_resnet_name: str,
         elif rcnn_backbone_model_resnet_name == 'resnet101':
             weights = ResNet101_Weights.DEFAULT
             backbone = resnet_fpn_backbone(backbone_name='resnet101', weights=weights)
+        elif rcnn_backbone_model_resnet_name == 'resnet152':
+            weights = ResNet152_Weights.DEFAULT
+            backbone = resnet_fpn_backbone(backbone_name='resnet152', weights=weights)
         else:
             # Extend this branch for other models as needed
             raise NotImplementedError(f"Pretrained weights for {rcnn_backbone_model_resnet_name} not implemented."

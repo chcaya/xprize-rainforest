@@ -52,6 +52,7 @@ class DetectorTrainIOConfig(BaseConfig):
     base_params_config: DetectorBaseParamsConfig
     architecture_config: DetectorArchitectureConfig
 
+    grad_accumulation_steps: int
     rcnn_backbone_model_pretrained: bool
     start_checkpoint_state_dict_path: str or None
     learning_rate: float
@@ -79,6 +80,7 @@ class DetectorTrainIOConfig(BaseConfig):
             output_folder=detector_train_io['output_folder'],
             output_name=detector_train_io['output_name'],
             train_log_interval=int(detector_train_io['train_log_interval']),
+            grad_accumulation_steps=int(detector_train_model_config['grad_accumulation_steps']),
             rcnn_backbone_model_pretrained=bool(detector_train_model_config['rcnn_backbone_model_pretrained']),
             start_checkpoint_state_dict_path=detector_train_model_config['start_checkpoint_state_dict_path'],
             learning_rate=float(detector_train_model_config['learning_rate']),
@@ -104,6 +106,7 @@ class DetectorTrainIOConfig(BaseConfig):
                     'base_params': self.base_params_config.to_structured_dict(),
                     'architecture': self.architecture_config.to_structured_dict(),
                     'model_config': {
+                        'grad_accumulation_steps': self.grad_accumulation_steps,
                         'rcnn_backbone_model_pretrained': self.rcnn_backbone_model_pretrained,
                         'start_checkpoint_state_dict_path': self.start_checkpoint_state_dict_path,
                         'learning_rate': self.learning_rate,

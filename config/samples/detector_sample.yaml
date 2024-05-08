@@ -14,6 +14,7 @@ detector:
             architecture_name: 'basic'
             rcnn_backbone_model_resnet_name: 'resnet50'
         model_config:
+            grad_accumulation_steps: 1
             rcnn_backbone_model_pretrained: true
             start_checkpoint_state_dict_path: null
             learning_rate: 5e-4
