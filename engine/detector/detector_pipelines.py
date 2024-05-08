@@ -157,18 +157,27 @@ class DetectorTrainPipeline(DetectorScorePipeline):
             targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
             loss_dict = self.model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
+            loss = sum(loss for loss in loss_dict.values())
+            loss = loss / self.config.grad_accumulation_steps
 
-            optimizer.zero_grad()
-            losses.backward()
-            optimizer.step()
+            loss.backward()
+            accumulated_loss += loss.detach().item()
 
-            accumulated_loss += losses.detach()
-            if batch_idx != 0 and batch_idx % self.config.train_log_interval == 0:
-                self.writer.add_scalar('Loss/train',
-                                       accumulated_loss.item() / self.config.train_log_interval,
-                                       epoch * len(data_loader) + batch_idx)
+            # Perform optimization step only after accumulating enough gradients
+            if (batch_idx + 1) % self.config.grad_accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+
+            # Logging at intervals of train_log_interval effective batches
+            if (batch_idx + 1) % (self.config.train_log_interval * self.config.grad_accumulation_steps) == 0:
+                average_loss = accumulated_loss / self.config.train_log_interval
+                self.writer.add_scalar('Loss/train', average_loss, epoch * len(data_loader) + batch_idx)
                 accumulated_loss = 0.0
+
+        # Ensure any remaining gradients are applied
+        if (batch_idx + 1) % self.config.grad_accumulation_steps != 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
     def train(self,
               train_ds: DetectionLabeledRasterCocoDataset,
@@ -185,6 +194,10 @@ class DetectorTrainPipeline(DetectorScorePipeline):
         valid_dl = DataLoader(valid_ds, batch_size=self.config.base_params_config.batch_size, shuffle=False,
                               collate_fn=collate_fn,
                               num_workers=3, persistent_workers=True)
+
+        print(f"Training for {self.config.n_epochs} epochs...")
+        print(f'Effective batch size: {self.config.base_params_config.batch_size * self.config.grad_accumulation_steps}'
+              f' = batch_size * grad_accumulation_steps = {self.config.base_params_config.batch_size} * {self.config.grad_accumulation_steps}')
 
         for epoch in range(self.config.n_epochs):
             self._train_one_epoch(optimizer, train_dl, epoch=epoch)
