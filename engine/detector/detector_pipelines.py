@@ -123,7 +123,7 @@ class DetectorTrainPipeline(DetectorScorePipeline):
                          box_predictions_per_image=self.config.base_params_config.box_predictions_per_image)
 
         self.output_folder = Path(self.config.output_folder)
-        self.output_folder.mkdir(exist_ok=True)
+        self.output_folder.mkdir(exist_ok=True, parents=True)
 
         self.model_output_folder = self.output_folder / self.config.output_name
         self.logs_folder = self.model_output_folder / "logs"
