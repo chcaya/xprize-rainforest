@@ -28,8 +28,12 @@ def collate_fn_detection(batch):
     else:
         data = torch.tensor([item[0] for item in batch], dtype=torch.float32)
 
-    labels = [{'boxes': torch.tensor(item[1]['boxes'], dtype=torch.float32),
-               'labels': torch.tensor(item[1]['labels'], dtype=torch.long)} for item in batch]
+    # For detection, we set all labels to 1, we don't care about the object class in our case
+    for item in batch:
+        item[1]['labels'] = [1 for _ in item[1]['labels']]
+
+    labels = [{'boxes': torch.tensor(np.array(item[1]['boxes']), dtype=torch.float32),
+               'labels': torch.tensor(np.array(item[1]['labels']), dtype=torch.long)} for item in batch]
 
     return data, labels
 
