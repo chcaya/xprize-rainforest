@@ -89,9 +89,9 @@ class PatchSwapping(torch.nn.Module):
         self.swap_size = swap_size
 
     def forward(self, x):
-        H, W = x.shape[-2], x.shape[-1]
-        x1, y1 = random.randint(0, H - self.swap_size), random.randint(0, W - self.swap_size)
-        x2, y2 = random.randint(0, H - self.swap_size), random.randint(0, W - self.swap_size)
+        height, width = x.shape[-2], x.shape[-1]
+        x1, y1 = random.randint(0, height - self.swap_size), random.randint(0, width - self.swap_size)
+        x2, y2 = random.randint(0, height - self.swap_size), random.randint(0, width - self.swap_size)
         patch = x[:, x1:x1 + self.swap_size, y1:y1 + self.swap_size].clone()
         x[:, x1:x1 + self.swap_size, y1:y1 + self.swap_size] = x[:, x2:x2 + self.swap_size, y2:y2 + self.swap_size]
         x[:, x2:x2 + self.swap_size, y2:y2 + self.swap_size] = patch
@@ -122,7 +122,7 @@ class Solarization(torch.nn.Module):
         self.threshold = threshold
 
     def forward(self, img):
-        return torch.where(img > self.threshold, 255 - img, img)
+        return torch.where(img * 255 > self.threshold, 255 - img, img) / 255
 
 
 class HorizontalFlip(torch.nn.Module):

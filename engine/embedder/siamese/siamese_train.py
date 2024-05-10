@@ -19,7 +19,8 @@ from geodataset.dataset.polygon_dataset import SiameseSamplerDataset, SiameseSam
     SiameseValidationDataset
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
-
+from engine.constants import data_paths
+from engine.embedder.siamese.transforms import detector_transforms
 
 def infer_model(model, dataloader):
     all_labels = []
@@ -137,7 +138,7 @@ if __name__ == '__main__':
 
     train_dataset_quebec = SiameseSamplerInternalDataset(
         fold='train',
-        root_path=Path('C:/Users/Hugo/Documents/Data/pre_processed/final_dataset_polygons/quebec_trees')
+        root_path= data_paths['quebec']
     )
 
     dataset_config = {
@@ -181,21 +182,17 @@ if __name__ == '__main__':
         ]
     }
 
-    transform = A.Compose([                         # TODO Daoud said he would provide a complete augmentation transform
-            A.Rotate(limit=45, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5)
-        ])
+    transform = (A.Compose(detector_transforms))
 
     siamese_sampler = SiameseSamplerDataset(dataset_config=dataset_config, transform=transform)
 
     valid_train_dataset = SiameseValidationDataset(
         fold='train',
-        root_path=Path('C:/Users/Hugo/Documents/Data/pre_processed/final_dataset_polygons/quebec_trees')
+        root_path= data_paths['quebec']
     )
     valid_valid_dataset = SiameseValidationDataset(
         fold='valid',
-        root_path=Path('C:/Users/Hugo/Documents/Data/pre_processed/final_dataset_polygons/quebec_trees')
+        root_path= data_paths['quebec']
     )
 
     valid_train_loader = torch.utils.data.DataLoader(valid_train_dataset, batch_size=128, shuffle=False, num_workers=3,

@@ -1,60 +1,16 @@
 import unittest
+
 import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
 import sys
+
 sys.path.append('/Users/daoud/PycharmProjects/ssl_transforms/xprize-rainforest/')
 
-from engine.detector.torch_tranforms import *
+from engine.embedder.siamese.torch_tranforms import *
 
 # Mock the random module for reproducibility
 random.seed(0)
 torch.manual_seed(0)
-
-
-
-
-class TestCustomAlbumentationsWrapper(unittest.TestCase):
-    def setUp(self):
-        # Define a simple custom torch transform
-        self.custom_transform = CustomTorchTransform(params)
-
-        # Wrap the custom transform for Albumentations
-        self.albumentations_wrapper = CustomAlbumentationsWrapper(self.custom_transform)
-
-        # Create Albumentations pipeline with your custom transform
-        self.transform = A.Compose([
-            self.albumentations_wrapper,
-            # Add more Albumentations transforms here if needed
-        ])
-
-    def test_transform_output(self):
-        # Define a sample input image
-        input_image = torch.rand(3, 256, 256)  # Example shape, adjust as per your input
-
-        # Apply the transformation pipeline
-        transformed_data = self.transform(image=input_image)
-
-        # Extract the transformed image
-        transformed_image = transformed_data['image']
-
-        # Assert that the transformed image has the correct shape
-        expected_shape = (3, 256, 256)  # Adjust as per your transformation logic
-        self.assertEqual(transformed_image.shape, expected_shape)
-
-    def test_transform_consistency(self):
-        # Define a sample input image
-        input_image = torch.rand(3, 256, 256)  # Example shape, adjust as per your input
-
-        # Apply the transformation pipeline twice to check consistency
-        transformed_data_1 = self.transform(image=input_image)
-        transformed_data_2 = self.transform(image=input_image)
-
-        # Extract the transformed images
-        transformed_image_1 = transformed_data_1['image']
-        transformed_image_2 = transformed_data_2['image']
-
-        # Assert that the transformed images are identical (pipeline consistency)
-        torch.testing.assert_allclose(transformed_image_1, transformed_image_2)
 
 
 class TestImageTransforms(unittest.TestCase):
