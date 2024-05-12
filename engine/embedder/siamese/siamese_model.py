@@ -8,7 +8,7 @@ class SiameseNetwork2(nn.Module):
     def __init__(self):
         super(SiameseNetwork2, self).__init__()
         # Load a ResNet50 model pre-trained on ImageNet
-        self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)            # TODO try bigger models as backbone!!!
         # Remove the final fully connected layer
         self.backbone.fc = nn.Identity()
 

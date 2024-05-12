@@ -32,7 +32,7 @@ detector_config:
                 box_predictions_per_image: 250
             architecture:
                 architecture_name: 'basic'
-                rcnn_backbone_model_resnet_name: 'resnet50'
+                backbone_model_resnet_name: 'resnet50'
 
     aggregator:
         polygon_type: 'box'

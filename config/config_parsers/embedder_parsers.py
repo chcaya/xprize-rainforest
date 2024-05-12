@@ -6,7 +6,7 @@ from config.config_parsers.base_config_parsers import BaseConfig, BaseIntermedia
 @dataclass
 class EmbedderArchitectureConfig(BaseIntermediateConfig):
     architecture_name: str
-    rcnn_backbone_model_resnet_name: str
+    backbone_model_resnet_name: str
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -15,7 +15,7 @@ class EmbedderArchitectureConfig(BaseIntermediateConfig):
     def to_structured_dict(self):
         config = {
             'architecture_name': self.architecture_name,
-            'rcnn_backbone_model_resnet_name': self.rcnn_backbone_model_resnet_name,
+            'backbone_model_resnet_name': self.backbone_model_resnet_name,
         }
 
         return config
