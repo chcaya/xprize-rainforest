@@ -77,6 +77,10 @@ def mask_to_polygon(mask: np.ndarray, simplify_tolerance: float = 1.0) -> Polygo
     # Find contours on the mask, assuming mask is binary
     contours = find_contours(mask, 0.5)  # Use 0.5 as level to find contours
 
+    if len(contours) == 0:
+        # returning empty, dummy polygon at 0,0
+        return Polygon([(0, 0), (0, 0), (0, 0)])
+
     # Take the longest contour as the main outline of the object
     longest_contour = max(contours, key=len)
 

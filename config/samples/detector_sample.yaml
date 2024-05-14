@@ -11,17 +11,18 @@ detector:
             batch_size: 25
             box_predictions_per_image: 250
         architecture:
-            architecture_name: 'basic'
-            rcnn_backbone_model_resnet_name: 'resnet50'
+            architecture_name: 'fasterrcnn'
+            backbone_model_resnet_name: 'resnet50'
         model_config:
             grad_accumulation_steps: 1
-            rcnn_backbone_model_pretrained: true
+            backbone_model_pretrained: true
             start_checkpoint_state_dict_path: null
             learning_rate: 5e-4
             n_epochs: 500
             save_model_every_n_epoch: 5
             backbone_resnet_out_channels: 2048
             scheduler_step_size: 10     # here, step=epochs
+            scheduler_warmup_steps: 10  # here, step=epochs
             scheduler_gamma: 0.1
 
     score:
@@ -36,7 +37,7 @@ detector:
             box_predictions_per_image: 250
         architecture:
             architecture_name: 'basic'
-            rcnn_backbone_model_resnet_name: 'resnet50'
+            backbone_model_resnet_name: 'resnet50'
 
     infer:
         io:
@@ -50,4 +51,4 @@ detector:
             box_predictions_per_image: 250
         architecture:
             architecture_name: 'basic'
-            rcnn_backbone_model_resnet_name: 'resnet50'
+            backbone_model_resnet_name: 'resnet50'
