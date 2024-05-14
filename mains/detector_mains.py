@@ -14,10 +14,10 @@ from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorSc
 
 def detector_train_main(config: DetectorTrainIOConfig):
     trainer = DetectorTrainPipeline.from_config(config)
-    train_ds = DetectionLabeledRasterCocoDataset(root_path=Path(config.data_root),
+    train_ds = DetectionLabeledRasterCocoDataset(root_path=[Path(path) for path in config.data_root],
                                                  fold=config.train_aoi_name,
                                                  transform=DetectorTrainPipeline.get_data_augmentation_transform())
-    valid_ds = DetectionLabeledRasterCocoDataset(root_path=Path(config.data_root),
+    valid_ds = DetectionLabeledRasterCocoDataset(root_path=[Path(path) for path in config.data_root],
                                                  fold=config.valid_aoi_name,
                                                  transform=None)  # No augmentation for validation
     trainer.train(train_ds=train_ds, valid_ds=valid_ds, collate_fn=collate_fn_detection)
