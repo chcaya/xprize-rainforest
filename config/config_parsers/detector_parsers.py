@@ -41,7 +41,7 @@ class DetectorArchitectureConfig(BaseIntermediateConfig):
 
 @dataclass
 class DetectorTrainIOConfig(BaseConfig):
-    data_root: str
+    data_root: list[str]
     output_folder: str
     output_name: str
     train_aoi_name: str
