@@ -41,11 +41,9 @@ class SiameseInferConfig(BaseConfig):
         config = {
             'embedder': {
                 'infer': {
-                    'siamese': {
-                        'checkpoint_path': self.checkpoint_path,
-                        'batch_size': self.batch_size,
-                        'architecture': self.architecture_config.to_structured_dict(),
-                    }
+                    'checkpoint_path': self.checkpoint_path,
+                    'batch_size': self.batch_size,
+                    'architecture': self.architecture_config.to_structured_dict(),
                 }
             }
         }

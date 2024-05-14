@@ -31,7 +31,8 @@ class SamPredictorWrapper:
     def _infer(self, image: np.ndarray, boxes: List[np.array]):
         self.predictor.set_image(image)
         box_array = np.array(boxes)
-        box_tensor = torch.Tensor(box_array).to(self.device)
+        box_tensor = torch.Tensor(box_array).to(self.device).to(torch.long)
+
         masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
                                                                     point_labels=None,
                                                                     boxes=box_tensor,

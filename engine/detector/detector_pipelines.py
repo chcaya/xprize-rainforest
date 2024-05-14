@@ -199,7 +199,7 @@ class DetectorTrainPipeline(DetectorScorePipeline):
             step_size=self.config.scheduler_step_size,
             gamma=self.config.scheduler_gamma,
             warmup_steps=self.config.scheduler_warmup_steps,
-            base_lr=0.0
+            base_lr=self.config.learning_rate / 100
         )
 
         train_dl = DataLoader(train_ds, batch_size=self.config.base_params_config.batch_size, shuffle=True,
@@ -216,14 +216,14 @@ class DetectorTrainPipeline(DetectorScorePipeline):
               f' = {self.config.base_params_config.batch_size * self.config.grad_accumulation_steps}')
 
         for epoch in range(self.config.n_epochs):
+            # also log the current learning rate
+            self.writer.add_scalar('lr', scheduler.get_lr()[0], epoch)
+
             self._train_one_epoch(optimizer, train_dl, epoch=epoch)
             scores, predictions = self._evaluate(valid_dl, epoch=epoch)
             self.writer.add_scalar('metric/map', scores['map'], epoch)
             self.writer.add_scalar('metric/map_50', scores['map_50'], epoch)
             self.writer.add_scalar('metric/map_75', scores['map_75'], epoch)
-
-            # also log the current learning rate
-            self.writer.add_scalar('lr', scheduler.get_lr()[0], epoch)
 
             scheduler.step()
 
