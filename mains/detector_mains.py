@@ -1,6 +1,7 @@
 from collections import defaultdict
 from pathlib import Path
 
+import torch
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 from geodataset.utils import TileNameConvention, CocoNameConvention, COCOGenerator
 
@@ -13,10 +14,10 @@ from engine.detector.detector_pipelines import DetectorTrainPipeline, DetectorSc
 
 def detector_train_main(config: DetectorTrainIOConfig):
     trainer = DetectorTrainPipeline.from_config(config)
-    train_ds = DetectionLabeledRasterCocoDataset(root_path=Path(config.data_root),
+    train_ds = DetectionLabeledRasterCocoDataset(root_path=[Path(path) for path in config.data_root],
                                                  fold=config.train_aoi_name,
                                                  transform=DetectorTrainPipeline.get_data_augmentation_transform())
-    valid_ds = DetectionLabeledRasterCocoDataset(root_path=Path(config.data_root),
+    valid_ds = DetectionLabeledRasterCocoDataset(root_path=[Path(path) for path in config.data_root],
                                                  fold=config.valid_aoi_name,
                                                  transform=None)  # No augmentation for validation
     trainer.train(train_ds=train_ds, valid_ds=valid_ds, collate_fn=collate_fn_detection)
@@ -62,7 +63,7 @@ def detector_score_main(config: DetectorScoreIOConfig):
                                        output_path=output_folder / detector_output_name,
                                        use_rle_for_labels=True,
                                        n_workers=config.coco_n_workers,
-                                       main_label_category_to_id_map=None)
+                                       coco_categories_list=None)
         coco_generator.generate_coco()
 
     config.save_yaml_config(output_path=output_folder / "detector_score_config.yaml")
@@ -91,6 +92,10 @@ def detector_infer_main(config: DetectorInferIOConfig):
     inferer = DetectorInferencePipeline.from_config(config)
     detector_result = inferer.infer(infer_ds=infer_ds, collate_fn=collate_fn_images)
     boxes, scores = detector_result_to_lists(detector_result)
+
+    # making sure the model is released from memory
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.empty_cache()
 
     coco_output_path = output_folder / f'{coco_output_name}'
 

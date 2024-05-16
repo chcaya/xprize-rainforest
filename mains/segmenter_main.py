@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import torch
 from geodataset.dataset import DetectionLabeledRasterCocoDataset
 from geodataset.utils import CocoNameConvention
 
@@ -35,6 +36,10 @@ def segmenter_infer_main(config: SegmenterInferIOConfig):
     sam.infer_on_multi_box_dataset(dataset=dataset,
                                    coco_json_output_path=coco_output_path
                                    )
+
+    # making sure the model is released from memory
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.empty_cache()
 
     config.save_yaml_config(output_path=output_folder / "segmenter_infer_config.yaml")
 

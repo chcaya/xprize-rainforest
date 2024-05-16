@@ -28,6 +28,8 @@ class XPrizePipeline:
         self.segmenter_tilerizer_output_folder = Path(self.config.output_folder) / 'segmenter_tilerizer_output'
         self.segmenter_output_folder = Path(self.config.output_folder) / 'segmenter_output'
         self.segmenter_aggregator_output_folder = Path(self.config.output_folder) / 'segmenter_aggregator_output'
+        self.classifier_tilerizer_output_folder = Path(self.config.output_folder) / 'classifier_tilerizer_output'
+        self.classifier_output_folder = Path(self.config.output_folder) / 'classifier_output'
 
     @classmethod
     def from_config(cls, xprize_config: XPrizeIOConfig):
@@ -133,9 +135,36 @@ class XPrizePipeline:
 
         # TODO tilerize with PolygonTilerizer
 
-        siamese_classifier(
-            data_roots=[segmenter_final_output_file.parent, segmenter_tiles_path],
-            fold='' # TODO
+        # Tilerizing the final dataset for the siamese classifier, with one tree per tile
+        embedder_tilerizer_config = self._get_tilerizer_config(
+            tilerizer_config=self.config.classifier_tilerizer_config,
+            output_folder=self.classifier_tilerizer_output_folder,
+            labels_path=segmenter_aggregator_geojson_path,
+            main_label_category_column_name=None  # TODO maybe change?
+        )
+
+        embedder_tiles_path, coco_paths = tilerizer_main(
+            config=embedder_tilerizer_config
+        )
+        classifier_coco_path = siamese_classifier(
+            data_roots=[coco_paths['infer'].parent, embedder_tiles_path],
+            fold='infer',
+            siamese_checkpoint=self.config.classifier_embedder_config.checkpoint_path,
+            scaler_checkpoint=self.config.classifier_infer_config.scaler_checkpoint_path,
+            svc_checkpoint=self.config.classifier_infer_config.classifier_checkpoint_path,
+            batch_size=self.config.classifier_embedder_config.batch_size,
+            product_name=self.raster_name,
+            ground_resolution=self.config.classifier_tilerizer_config.raster_resolution_config.ground_resolution,
+            scale_factor=self.config.classifier_tilerizer_config.raster_resolution_config.scale_factor,
+            output_path=self.classifier_output_folder
+        )
+        coco_to_geojson_config = self._get_coco_to_geojson_config(
+            input_tiles_root=embedder_tiles_path,
+            coco_path=classifier_coco_path,
+            output_folder=self.classifier_output_folder
+        )
+        tree_segments_classified_gdf, classifier_geojson_path = coco_to_geojson_main(
+            config=coco_to_geojson_config
         )
 
     def _get_tilerizer_config(self,

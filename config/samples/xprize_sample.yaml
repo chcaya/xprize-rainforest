@@ -1,10 +1,11 @@
 io:
-    raster_path: 'Data\raw\Neon_training\RGB\2019_DELA_5_423000_3601000_image_crop.tif'
-    output_folder: './output/test/xprize'
+    raster_path: '/media/hugobaudchon/4 TB/SBL_test_run/20240429_sblgeneral_xprize100ha_m3m_rgb.tif'
+    output_folder: './output/test/sbl_test_run'
     coco_n_workers: 5
 
 detector_config:
     tilerizer:
+        tile_type: 'tile'
         tile_size: 1024
         tile_overlap: 0.5
         raster_resolution:
@@ -31,15 +32,17 @@ detector_config:
                 box_predictions_per_image: 250
             architecture:
                 architecture_name: 'basic'
-                rcnn_backbone_model_resnet_name: 'resnet50'
+                backbone_model_resnet_name: 'resnet50'
 
     aggregator:
+        polygon_type: 'box'
         score_threshold: 0.4
         nms_threshold: 0.7
         nms_algorithm: 'iou'
 
 segmenter_config:
     tilerizer:
+        tile_type: 'tile'
         tile_size: 1024
         tile_overlap: 0.5
         raster_resolution:
@@ -65,6 +68,7 @@ segmenter_config:
         min_pixel_padding: 100
 
     aggregator:
+        polygon_type: 'segmentation'
         score_threshold: 0.4
         nms_threshold: 0.7
         nms_algorithm: 'iou'

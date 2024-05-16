@@ -6,7 +6,7 @@ import torch
 import torch.optim as optim
 import torchmetrics
 from tensorboardX import SummaryWriter
-from torch.optim.lr_scheduler import StepLR
+
 from torch.utils.data import DataLoader
 import albumentations as A
 from tqdm import tqdm
@@ -15,13 +15,16 @@ from config.config_parsers.detector_parsers import DetectorTrainIOConfig, Detect
 from engine.detector.model import Detector
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 
+from engine.detector.utils import WarmupStepLR
+
+
 class DetectorBasePipeline(ABC):
     def __init__(self,
                  batch_size: int,
                  architecture: str,
                  checkpoint_state_dict_path: str,
-                 rcnn_backbone_model_resnet_name: str,
-                 rcnn_backbone_model_pretrained: bool,
+                 backbone_model_resnet_name: str,
+                 backbone_model_pretrained: bool,
                  box_predictions_per_image: int):
 
         self.batch_size = batch_size
@@ -32,11 +35,11 @@ class DetectorBasePipeline(ABC):
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
         # No need to load the pretrained backbone model if we are starting from a custom checkpoint
-        rcnn_backbone_model_pretrained = False if checkpoint_state_dict_path else rcnn_backbone_model_pretrained
+        backbone_model_pretrained = False if checkpoint_state_dict_path else backbone_model_pretrained
 
         self.model = Detector(architecture=architecture,
-                              rcnn_backbone_model_resnet_name=rcnn_backbone_model_resnet_name,
-                              rcnn_backbone_model_pretrained=rcnn_backbone_model_pretrained,
+                              backbone_model_resnet_name=backbone_model_resnet_name,
+                              backbone_model_pretrained=backbone_model_pretrained,
                               box_predictions_per_image=box_predictions_per_image).to(self.device)
 
         if checkpoint_state_dict_path:
@@ -50,15 +53,15 @@ class DetectorScorePipeline(DetectorBasePipeline):
                  batch_size: int,
                  architecture: str,
                  checkpoint_state_dict_path: str,
-                 rcnn_backbone_model_resnet_name: str,
-                 rcnn_backbone_model_pretrained: bool,
+                 backbone_model_resnet_name: str,
+                 backbone_model_pretrained: bool,
                  box_predictions_per_image: int):
 
         super().__init__(batch_size=batch_size,
                          architecture=architecture,
                          checkpoint_state_dict_path=checkpoint_state_dict_path,
-                         rcnn_backbone_model_resnet_name=rcnn_backbone_model_resnet_name,
-                         rcnn_backbone_model_pretrained=rcnn_backbone_model_pretrained,
+                         backbone_model_resnet_name=backbone_model_resnet_name,
+                         backbone_model_pretrained=backbone_model_pretrained,
                          box_predictions_per_image=box_predictions_per_image)
 
         self.map_metric = torchmetrics.detection.MeanAveragePrecision(
@@ -72,8 +75,8 @@ class DetectorScorePipeline(DetectorBasePipeline):
         return cls(batch_size=detector_score_config.base_params_config.batch_size,
                    architecture=detector_score_config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=detector_score_config.checkpoint_state_dict_path,
-                   rcnn_backbone_model_resnet_name=detector_score_config.architecture_config.rcnn_backbone_model_resnet_name,
-                   rcnn_backbone_model_pretrained=False,
+                   backbone_model_resnet_name=detector_score_config.architecture_config.backbone_model_resnet_name,
+                   backbone_model_pretrained=False,
                    box_predictions_per_image=detector_score_config.base_params_config.box_predictions_per_image)
 
     def _evaluate(self, data_loader, epoch=None):
@@ -117,12 +120,12 @@ class DetectorTrainPipeline(DetectorScorePipeline):
         super().__init__(batch_size=self.config.base_params_config.batch_size,
                          architecture=self.config.architecture_config.architecture_name,
                          checkpoint_state_dict_path=self.config.start_checkpoint_state_dict_path,
-                         rcnn_backbone_model_resnet_name=self.config.architecture_config.rcnn_backbone_model_resnet_name,
-                         rcnn_backbone_model_pretrained=self.config.rcnn_backbone_model_pretrained,
+                         backbone_model_resnet_name=self.config.architecture_config.backbone_model_resnet_name,
+                         backbone_model_pretrained=self.config.backbone_model_pretrained,
                          box_predictions_per_image=self.config.base_params_config.box_predictions_per_image)
 
         self.output_folder = Path(self.config.output_folder)
-        self.output_folder.mkdir(exist_ok=True)
+        self.output_folder.mkdir(exist_ok=True, parents=True)
 
         self.model_output_folder = self.output_folder / self.config.output_name
         self.logs_folder = self.model_output_folder / "logs"
@@ -156,18 +159,27 @@ class DetectorTrainPipeline(DetectorScorePipeline):
             targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
 
             loss_dict = self.model(images, targets)
-            losses = sum(loss for loss in loss_dict.values())
+            loss = sum(loss for loss in loss_dict.values())
+            loss = loss / self.config.grad_accumulation_steps
 
-            optimizer.zero_grad()
-            losses.backward()
-            optimizer.step()
+            loss.backward()
+            accumulated_loss += loss.detach().item()
 
-            accumulated_loss += losses.detach()
-            if batch_idx != 0 and batch_idx % self.config.train_log_interval == 0:
-                self.writer.add_scalar('Loss/train',
-                                       accumulated_loss.item() / self.config.train_log_interval,
-                                       epoch * len(data_loader) + batch_idx)
+            # Perform optimization step only after accumulating enough gradients
+            if (batch_idx + 1) % self.config.grad_accumulation_steps == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+
+            # Logging at intervals of train_log_interval effective batches
+            if (batch_idx + 1) % (self.config.train_log_interval * self.config.grad_accumulation_steps) == 0:
+                average_loss = accumulated_loss / self.config.train_log_interval
+                self.writer.add_scalar('Loss/train', average_loss, self.config.base_params_config.batch_size * (epoch * len(data_loader) + batch_idx))
                 accumulated_loss = 0.0
+
+        # Ensure any remaining gradients are applied
+        if (batch_idx + 1) % self.config.grad_accumulation_steps != 0:
+            optimizer.step()
+            optimizer.zero_grad()
 
     def train(self,
               train_ds: DetectionLabeledRasterCocoDataset,
@@ -175,8 +187,20 @@ class DetectorTrainPipeline(DetectorScorePipeline):
               collate_fn: callable):
         params = [p for p in self.model.parameters() if p.requires_grad]
 
-        optimizer = optim.SGD(params, lr=self.config.learning_rate, momentum=0.9, weight_decay=0.0005)
-        scheduler = StepLR(optimizer, step_size=self.config.scheduler_step_size, gamma=self.config.scheduler_gamma)
+        optimizer = optim.SGD(
+            params,
+            lr=self.config.learning_rate,
+            momentum=0.9,
+            weight_decay=0.0005
+        )
+
+        scheduler = WarmupStepLR(
+            optimizer,
+            step_size=self.config.scheduler_step_size,
+            gamma=self.config.scheduler_gamma,
+            warmup_steps=self.config.scheduler_warmup_steps,
+            base_lr=self.config.learning_rate / 100
+        )
 
         train_dl = DataLoader(train_ds, batch_size=self.config.base_params_config.batch_size, shuffle=True,
                               collate_fn=collate_fn,
@@ -185,12 +209,21 @@ class DetectorTrainPipeline(DetectorScorePipeline):
                               collate_fn=collate_fn,
                               num_workers=3, persistent_workers=True)
 
+        print(f"Training for {self.config.n_epochs} epochs...")
+        print(f'Effective batch size'
+              f' = batch_size * grad_accumulation_steps'
+              f' = {self.config.base_params_config.batch_size} * {self.config.grad_accumulation_steps}'
+              f' = {self.config.base_params_config.batch_size * self.config.grad_accumulation_steps}')
+
         for epoch in range(self.config.n_epochs):
+            # also log the current learning rate
+            self.writer.add_scalar('lr', scheduler.get_lr()[0], epoch)
+
             self._train_one_epoch(optimizer, train_dl, epoch=epoch)
             scores, predictions = self._evaluate(valid_dl, epoch=epoch)
-            self.writer.add_scalar('metric/map', scores['map'], (epoch + 1) * len(train_dl))
-            self.writer.add_scalar('metric/map_50', scores['map_50'], (epoch + 1) * len(train_dl))
-            self.writer.add_scalar('metric/map_75', scores['map_75'], (epoch + 1) * len(train_dl))
+            self.writer.add_scalar('metric/map', scores['map'], epoch)
+            self.writer.add_scalar('metric/map_50', scores['map_50'], epoch)
+            self.writer.add_scalar('metric/map_75', scores['map_75'], epoch)
 
             scheduler.step()
 
@@ -228,15 +261,15 @@ class DetectorInferencePipeline(DetectorBasePipeline):
                  batch_size: int,
                  architecture: str,
                  checkpoint_state_dict_path: str,
-                 rcnn_backbone_model_resnet_name: str,
-                 rcnn_backbone_model_pretrained: bool,
+                 backbone_model_resnet_name: str,
+                 backbone_model_pretrained: bool,
                  box_predictions_per_image: int):
 
         super().__init__(batch_size=batch_size,
                          architecture=architecture,
                          checkpoint_state_dict_path=checkpoint_state_dict_path,
-                         rcnn_backbone_model_resnet_name=rcnn_backbone_model_resnet_name,
-                         rcnn_backbone_model_pretrained=rcnn_backbone_model_pretrained,
+                         backbone_model_resnet_name=backbone_model_resnet_name,
+                         backbone_model_pretrained=backbone_model_pretrained,
                          box_predictions_per_image=box_predictions_per_image)
 
     @classmethod
@@ -244,8 +277,8 @@ class DetectorInferencePipeline(DetectorBasePipeline):
         return cls(batch_size=config.base_params_config.batch_size,
                    architecture=config.architecture_config.architecture_name,
                    checkpoint_state_dict_path=config.checkpoint_state_dict_path,
-                   rcnn_backbone_model_resnet_name=config.architecture_config.rcnn_backbone_model_resnet_name,
-                   rcnn_backbone_model_pretrained=False,
+                   backbone_model_resnet_name=config.architecture_config.backbone_model_resnet_name,
+                   backbone_model_pretrained=False,
                    box_predictions_per_image=config.base_params_config.box_predictions_per_image)
 
     def _infer(self, data_loader):

@@ -1,6 +1,54 @@
 from dataclasses import dataclass
 
-from config.config_parsers.base_config_parsers import BaseConfig
+from config.config_parsers.base_config_parsers import BaseConfig, BaseIntermediateConfig
+
+
+@dataclass
+class EmbedderArchitectureConfig(BaseIntermediateConfig):
+    architecture_name: str
+    backbone_model_resnet_name: str
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        return cls(**config)
+
+    def to_structured_dict(self):
+        config = {
+            'architecture_name': self.architecture_name,
+            'backbone_model_resnet_name': self.backbone_model_resnet_name,
+        }
+
+        return config
+
+
+@dataclass
+class SiameseInferConfig(BaseConfig):
+    checkpoint_path: str
+    batch_size: int
+    architecture_config: EmbedderArchitectureConfig
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        embedder_infer_config = config['embedder']['infer']
+
+        return cls(
+            checkpoint_path=embedder_infer_config['checkpoint_path'],
+            batch_size=embedder_infer_config['batch_size'],
+            architecture_config=EmbedderArchitectureConfig.from_dict(embedder_infer_config['architecture']),
+        )
+
+    def to_structured_dict(self) -> dict:
+        config = {
+            'embedder': {
+                'infer': {
+                    'checkpoint_path': self.checkpoint_path,
+                    'batch_size': self.batch_size,
+                    'architecture': self.architecture_config.to_structured_dict(),
+                }
+            }
+        }
+
+        return config
 
 
 @dataclass

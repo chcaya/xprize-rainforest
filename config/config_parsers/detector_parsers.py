@@ -24,7 +24,7 @@ class DetectorBaseParamsConfig(BaseIntermediateConfig):
 @dataclass
 class DetectorArchitectureConfig(BaseIntermediateConfig):
     architecture_name: str
-    rcnn_backbone_model_resnet_name: str
+    backbone_model_resnet_name: str
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -33,7 +33,7 @@ class DetectorArchitectureConfig(BaseIntermediateConfig):
     def to_structured_dict(self):
         config = {
             'architecture_name': self.architecture_name,
-            'rcnn_backbone_model_resnet_name': self.rcnn_backbone_model_resnet_name,
+            'backbone_model_resnet_name': self.backbone_model_resnet_name,
         }
 
         return config
@@ -41,7 +41,7 @@ class DetectorArchitectureConfig(BaseIntermediateConfig):
 
 @dataclass
 class DetectorTrainIOConfig(BaseConfig):
-    data_root: str
+    data_root: list[str]
     output_folder: str
     output_name: str
     train_aoi_name: str
@@ -52,13 +52,15 @@ class DetectorTrainIOConfig(BaseConfig):
     base_params_config: DetectorBaseParamsConfig
     architecture_config: DetectorArchitectureConfig
 
-    rcnn_backbone_model_pretrained: bool
+    grad_accumulation_steps: int
+    backbone_model_pretrained: bool
     start_checkpoint_state_dict_path: str or None
     learning_rate: float
     n_epochs: int
     save_model_every_n_epoch: int
     backbone_resnet_out_channels: int
     scheduler_step_size: int
+    scheduler_warmup_steps: int
     scheduler_gamma: float
 
     @classmethod
@@ -79,13 +81,15 @@ class DetectorTrainIOConfig(BaseConfig):
             output_folder=detector_train_io['output_folder'],
             output_name=detector_train_io['output_name'],
             train_log_interval=int(detector_train_io['train_log_interval']),
-            rcnn_backbone_model_pretrained=bool(detector_train_model_config['rcnn_backbone_model_pretrained']),
+            grad_accumulation_steps=int(detector_train_model_config['grad_accumulation_steps']),
+            backbone_model_pretrained=bool(detector_train_model_config['backbone_model_pretrained']),
             start_checkpoint_state_dict_path=detector_train_model_config['start_checkpoint_state_dict_path'],
             learning_rate=float(detector_train_model_config['learning_rate']),
             n_epochs=int(detector_train_model_config['n_epochs']),
             save_model_every_n_epoch=int(detector_train_model_config['save_model_every_n_epoch']),
             backbone_resnet_out_channels=int(detector_train_model_config['backbone_resnet_out_channels']),
             scheduler_step_size=int(detector_train_model_config['scheduler_step_size']),
+            scheduler_warmup_steps=int(detector_train_model_config['scheduler_warmup_steps']),
             scheduler_gamma=float(detector_train_model_config['scheduler_gamma']),
         )
 
@@ -104,13 +108,15 @@ class DetectorTrainIOConfig(BaseConfig):
                     'base_params': self.base_params_config.to_structured_dict(),
                     'architecture': self.architecture_config.to_structured_dict(),
                     'model_config': {
-                        'rcnn_backbone_model_pretrained': self.rcnn_backbone_model_pretrained,
+                        'grad_accumulation_steps': self.grad_accumulation_steps,
+                        'backbone_model_pretrained': self.backbone_model_pretrained,
                         'start_checkpoint_state_dict_path': self.start_checkpoint_state_dict_path,
                         'learning_rate': self.learning_rate,
                         'n_epochs': self.n_epochs,
                         'save_model_every_n_epoch': self.save_model_every_n_epoch,
                         'backbone_resnet_out_channels': self.backbone_resnet_out_channels,
                         'scheduler_step_size': self.scheduler_step_size,
+                        'scheduler_warmup_steps': self.scheduler_warmup_steps,
                         'scheduler_gamma': self.scheduler_gamma,
                     }
                 }
