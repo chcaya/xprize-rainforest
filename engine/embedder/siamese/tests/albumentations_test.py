@@ -4,7 +4,7 @@ from PIL import Image
 import torch
 from albumentations import Compose
 
-from engine.embedder.siamese.transforms import AlbumentationsTorchWrapper, detector_transforms  # Update 'your_module' to your actual module name
+from engine.embedder.siamese.transforms import AlbumentationsTorchWrapper, embedder_transforms  # Update 'your_module' to your actual module name
 from engine.embedder.siamese.torch_tranforms import (
     RandomChannelDropout, RandomSpectralTransform, GeometricDistortions,
     RandomNoiseInjection, PatchSwapping, ScaleChange, Solarization,
@@ -19,7 +19,7 @@ class TestAlbumentationsTransforms(unittest.TestCase):
         self.sample_image = torch.rand(3, 224, 224)  # Simulate a 3-channel RGB image with dimensions 224x224
         self.sample_image_numpy = self.sample_image.permute(1, 2, 0).detach().cpu().numpy()  # Simulate a 3-channel RGB image with dimensions 224x224
 
-        self.pipeline_transforms = detector_transforms
+        self.pipeline_transforms = embedder_transforms
 
     # Test to ensure the wrapper maintains image dimensions and type
     def test_wrapper_maintains_image_properties(self):

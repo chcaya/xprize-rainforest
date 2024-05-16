@@ -34,7 +34,8 @@ class AlbumentationsTorchWrapper(ImageOnlyTransform):
 
 
 A_Torch_Wrapper = AlbumentationsTorchWrapper
-detector_transforms = [
+
+embedder_transforms = [
     # drop permute layers
     A_Torch_Wrapper(RandomChannelDropout(drop_prob=0.2)),
     # A_Torch_Wrapper(RandomSpectralTransform()),
