@@ -15,7 +15,7 @@ from config.config_parsers.detector_parsers import DetectorTrainIOConfig, Detect
 from engine.detector.model import Detector
 from geodataset.dataset import DetectionLabeledRasterCocoDataset, UnlabeledRasterDataset
 
-from engine.detector.utils import WarmupStepLR
+from engine.detector.utils import WarmupStepLR, detector_result_to_lists
 
 
 class DetectorBasePipeline(ABC):
@@ -111,7 +111,11 @@ class DetectorScorePipeline(DetectorBasePipeline):
 
         scores, predictions = self._evaluate(test_dl)
         print(f"Score results: {scores}")
-        return scores, predictions
+        boxes, boxes_scores = detector_result_to_lists(predictions)
+        # Map tile paths to their corresponding raster names
+        # it's important to get the paths sorted by ids as the associated predictions will also be sorted by those ids.
+        tiles_paths = [value["path"] for key, value in sorted(test_ds.tiles.items(), key=lambda item: item[0])]
+        return tiles_paths, boxes, boxes_scores, scores
 
 
 class DetectorTrainPipeline(DetectorScorePipeline):
@@ -288,7 +292,7 @@ class DetectorInferencePipeline(DetectorBasePipeline):
 
         with torch.no_grad():
             data_loader_with_progress = tqdm(data_loader,
-                                             desc="Inferring...",
+                                             desc="Inferring detector...",
                                              leave=True)
             for images in data_loader_with_progress:
                 images = list(img.to(self.device) for img in images)
@@ -303,5 +307,7 @@ class DetectorInferencePipeline(DetectorBasePipeline):
                               num_workers=3, persistent_workers=True)
 
         results = self._infer(infer_dl)
-        return results
+        boxes, boxes_scores = detector_result_to_lists(results)
+        tiles_paths = infer_ds.tile_paths
+        return tiles_paths, boxes, boxes_scores
 

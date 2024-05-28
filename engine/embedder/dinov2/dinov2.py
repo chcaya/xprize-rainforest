@@ -124,18 +124,19 @@ class DINOv2Inference:
                     'area': label['area'].numpy().tolist(),
                     'iscrowd': label['iscrowd'].numpy().tolist(),
                     'image_id': [int(label['image_id'][0])] * len(label['labels']),
-                    'image_path': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels']),
+                    'tiles_paths': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels']),
                 })
                 dfs.append(df)
 
         stacked_embeddings = np.stack(embeddings_list, axis=0)
-        if self.config.use_pca:
-            stacked_embeddings = apply_pca_to_images(
-                stacked_embeddings,
-                pca_model_path=self.config.pca_model_path,
-                n_patches=self.config.pca_n_patches,                        # TODO I should save the pca model (fit with train fold) to then use it for valid, test !!! It really breaks results if not
-                n_features=self.config.pca_n_features
-            )
+
+        # if self.config.use_pca:
+        #     stacked_embeddings = apply_pca_to_images(
+        #         stacked_embeddings,
+        #         pca_model_path=self.config.pca_model_path,
+        #         n_patches=self.config.pca_n_patches,
+        #         n_features=self.config.pca_n_features
+        #     )
 
         for df, down_sampled_masks, reduced_embeddings in tqdm(
                 zip(dfs, down_sampled_masks_list, stacked_embeddings),

@@ -4,6 +4,8 @@ io:
     coco_n_workers: 5
 
 detector_config:
+    save_detector_intermediate_output: false
+
     tilerizer:
         tile_type: 'tile'
         tile_size: 1024
@@ -41,6 +43,8 @@ detector_config:
         nms_algorithm: 'iou'
 
 segmenter_config:
+    save_segmenter_intermediate_output: false
+
     tilerizer:
         tile_type: 'tile'
         tile_size: 1024
@@ -64,13 +68,13 @@ segmenter_config:
         model_type: 'vit_l'
         checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
         simplify_tolerance: 1.0
-        padding_percentage: 2.0
-        min_pixel_padding: 100
+        box_padding_percentage: 0.00
+
 
     aggregator:
         polygon_type: 'segmentation'
-        score_threshold: 0.4
-        nms_threshold: 0.7
+        score_threshold: 0.35
+        nms_threshold: 0.5
         nms_algorithm: 'iou'
 
 classifier_config:
@@ -94,9 +98,17 @@ classifier_config:
         }
 
     embedder:
-        model_type: 'siamese'
-        checkpoint_path: 'C:/Users/Hugo/Documents/Data/models/sam/sam_siamese_0b3195.pth'
+        infer:
+            batch_size: 16
+            siamese:
+                checkpoint_path: 'models/siamese_classifier/checkpoint_0_20000.pth'
+                architecture:
+                    architecture_name: 'siamese'
+                    backbone_model_resnet_name: 'resnet50'
 
     classifier:
-        model_type: 'svm'
-        checkpoint_path: 'C:/Users/Hugo/Documents/Data/models/sam/sam_svm_0b3195.pkl'
+        infer:
+            scaler_checkpoint_path: 'models/siamese_classifier/scaler.joblib'
+            classifier_checkpoint_path: 'models/siamese_classifier/svc.joblib'
+            architecture:
+                architecture_name: 'svm'

@@ -1,0 +1,7 @@
+clusterer:
+    io:
+        input_dataframe: str
+        output_folder: str
+    clustering_algorithm: 'kmeans'
+    clustering_algorithm_params:
+        n_clusters: 50

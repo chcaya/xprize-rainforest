@@ -64,13 +64,13 @@ class SamPredictorWrapper:
 
         return gdf
 
-    def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset, coco_json_output_path: Path):
+    def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset):
         dataset_with_progress = tqdm(dataset,
                                      desc="Inferring SAM...",
                                      leave=True)
         tiles_paths = []
         tiles_masks = []
-        tiles_scores = []
+        tiles_masks_scores = []
         for tile_idx, (image, boxes_data) in enumerate(dataset_with_progress):
             image = image[:3, :, :]
             image_hwc = image.transpose((1, 2, 0))
@@ -88,18 +88,6 @@ class SamPredictorWrapper:
             scores_pp = scores.squeeze().tolist()
             if isinstance(scores_pp, float):
                 scores_pp = [scores_pp]
-            tiles_scores.append(scores_pp)
+            tiles_masks_scores.append(scores_pp)
 
-        coco_generator = COCOGenerator(
-            description=f"Aggregated boxes from multiple tiles.",
-            tiles_paths=tiles_paths,
-            polygons=tiles_masks,
-            scores=tiles_scores,
-            categories=None,  # TODO add support for categories
-            other_attributes=None,  # TODO add support for other_attributes
-            output_path=coco_json_output_path,
-            use_rle_for_labels=True,  # TODO make this a parameter to the class
-            n_workers=5,  # TODO make this a parameter to the class
-            coco_categories_list=None  # TODO make this a parameter to the class
-        )
-        coco_generator.generate_coco()
+        return tiles_paths, tiles_masks, tiles_masks_scores

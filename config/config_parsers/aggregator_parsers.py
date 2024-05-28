@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List
 
 from config.config_parsers.base_config_parsers import BaseConfig
 
@@ -36,8 +37,9 @@ class AggregatorConfig(BaseConfig):
 @dataclass
 class AggregatorIOConfig(AggregatorConfig):
     input_tiles_root: str
-    coco_path: str
+    coco_path: str or None
     output_folder: str
+    scores_names: List[str] or None
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -48,6 +50,7 @@ class AggregatorIOConfig(AggregatorConfig):
             input_tiles_root=aggregator_io_config['input_tiles_root'],
             coco_path=aggregator_io_config['coco_path'],
             output_folder=aggregator_io_config['output_folder'],
+            scores_names=aggregator_io_config['scores_names']
         )
 
     def to_structured_dict(self):
@@ -56,4 +59,5 @@ class AggregatorIOConfig(AggregatorConfig):
             'input_tiles_root': self.input_tiles_root,
             'coco_path': self.coco_path,
             'output_folder': self.output_folder,
+            'scores_names': self.scores_names
         }

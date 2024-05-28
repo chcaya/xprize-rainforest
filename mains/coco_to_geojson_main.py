@@ -10,6 +10,8 @@ def coco_to_geojson_main(config: CocoToGeojsonIOConfig):
     output_folder = Path(config.output_folder)
     output_folder.mkdir(exist_ok=True, parents=True)
 
+    print('Converting COCO file to geojson...')
+
     product_name, scale_factor, ground_resolution, fold = CocoNameConvention.parse_name(Path(config.coco_path).name)
 
     geojson_name = GeoJsonNameConvention.create_name(product_name=product_name,

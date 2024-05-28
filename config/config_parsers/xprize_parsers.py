@@ -15,12 +15,16 @@ class XPrizeIOConfig(BaseConfig):
     output_folder: str
     coco_n_workers: int
 
+    save_detector_intermediate_output: bool
     detector_tilerizer_config: TilerizerConfig
     detector_infer_config: DetectorInferConfig
     detector_aggregator_config: AggregatorConfig
+
+    save_segmenter_intermediate_output: bool
     segmenter_tilerizer_config: TilerizerConfig
     segmenter_infer_config: SegmenterInferConfig
     segmenter_aggregator_config: AggregatorConfig
+
     classifier_tilerizer_config: TilerizerConfig
     classifier_embedder_config: SiameseInferConfig
     classifier_infer_config: ClassifierInferConfig
@@ -31,12 +35,16 @@ class XPrizeIOConfig(BaseConfig):
         segmenter_config = config['segmenter_config']
         classifier_config = config['classifier_config']
 
+        save_detector_intermediate_output = detector_config['save_detector_intermediate_output']
         detector_tilerizer_config = TilerizerConfig.from_dict(detector_config)
         detector_infer_config = DetectorInferConfig.from_dict(detector_config)
         detector_aggregator_config = AggregatorConfig.from_dict(detector_config)
+
+        save_segmenter_intermediate_output = segmenter_config['save_segmenter_intermediate_output']
         segmenter_tilerizer_config = TilerizerConfig.from_dict(segmenter_config)
         segmenter_infer_config = SegmenterInferConfig.from_dict(segmenter_config)
         segmenter_aggregator_config = AggregatorConfig.from_dict(segmenter_config)
+
         classifier_tilerizer_config = TilerizerConfig.from_dict(classifier_config)
         classifier_embedder_config = SiameseInferConfig.from_dict(classifier_config)
         classifier_infer_config = ClassifierInferConfig.from_dict(classifier_config)
@@ -47,9 +55,11 @@ class XPrizeIOConfig(BaseConfig):
             raster_path=xprize_io_config['raster_path'],
             output_folder=xprize_io_config['output_folder'],
             coco_n_workers=xprize_io_config['coco_n_workers'],
+            save_detector_intermediate_output=save_detector_intermediate_output,
             detector_tilerizer_config=detector_tilerizer_config,
             detector_infer_config=detector_infer_config,
             detector_aggregator_config=detector_aggregator_config,
+            save_segmenter_intermediate_output=save_segmenter_intermediate_output,
             segmenter_tilerizer_config=segmenter_tilerizer_config,
             segmenter_infer_config=segmenter_infer_config,
             segmenter_aggregator_config=segmenter_aggregator_config,
@@ -71,6 +81,7 @@ class XPrizeIOConfig(BaseConfig):
                 'aggregator': self.detector_aggregator_config.to_structured_dict()['aggregator']
             },
             'segmenter_config': {
+                'save_segmenter_intermediate_output': self.save_segmenter_intermediate_output,
                 'tilerizer': self.segmenter_tilerizer_config.to_structured_dict()['tilerizer'],
                 'segmenter': self.segmenter_infer_config.to_structured_dict()['segmenter'],
                 'aggregator': self.segmenter_aggregator_config.to_structured_dict()['aggregator']

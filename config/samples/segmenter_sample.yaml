@@ -6,5 +6,5 @@ segmenter:
     model_type: 'vit_l'
     checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
     simplify_tolerance: 1.0
-    padding_percentage: 2.0
-    min_pixel_padding: 100
+    box_padding_percentage: 0.00
+
