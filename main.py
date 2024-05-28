@@ -9,7 +9,7 @@ from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
 from config.config_parsers.xprize_parsers import XPrizeIOConfig
 from mains import *
-from mains.aggregator_main import aggregator_main
+from mains.aggregator_main import aggregator_main_with_coco_input
 from mains.coco_to_geojson_main import coco_to_geojson_main
 from mains.detector_mains import detector_infer_main
 from mains.embedder_main import embedder_infer_main
@@ -44,7 +44,7 @@ if __name__ == "__main__":
         detector_infer_main(config)
     elif task == "aggregator":
         config = AggregatorIOConfig.from_config_path(config_path)
-        aggregator_main(config)
+        aggregator_main_with_coco_input(config)
     elif task == "segmenter" and subtask == "infer":
         config = SegmenterInferIOConfig.from_config_path(config_path)
         segmenter_infer_main(config)

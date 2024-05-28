@@ -22,52 +22,14 @@ class EmbedderArchitectureConfig(BaseIntermediateConfig):
 
 
 @dataclass
-class SiameseInferConfig(BaseConfig):
-    checkpoint_path: str
-    batch_size: int
-    architecture_config: EmbedderArchitectureConfig
-
-    @classmethod
-    def from_dict(cls, config: dict):
-        embedder_infer_config = config['embedder']['infer']
-
-        return cls(
-            checkpoint_path=embedder_infer_config['checkpoint_path'],
-            batch_size=embedder_infer_config['batch_size'],
-            architecture_config=EmbedderArchitectureConfig.from_dict(embedder_infer_config['architecture']),
-        )
-
-    def to_structured_dict(self) -> dict:
-        config = {
-            'embedder': {
-                'infer': {
-                    'checkpoint_path': self.checkpoint_path,
-                    'batch_size': self.batch_size,
-                    'architecture': self.architecture_config.to_structured_dict(),
-                }
-            }
-        }
-
-        return config
-
-
-@dataclass
 class EmbedderInferConfig(BaseConfig):
     batch_size: int
-    use_pca: bool
-    pca_model_path: str
-    pca_n_features: int
-    pca_n_patches: int
 
     @classmethod
     def from_dict(cls, config: dict):
         embedder_infer_config = config['embedder']['infer']
         return cls(
             batch_size=embedder_infer_config['batch_size'],
-            use_pca=embedder_infer_config['use_pca'],
-            pca_model_path=embedder_infer_config['pca_model_path'],
-            pca_n_features=embedder_infer_config['pca_n_features'],
-            pca_n_patches=embedder_infer_config['pca_n_patches'],
         )
 
     def to_structured_dict(self) -> dict:
@@ -75,10 +37,6 @@ class EmbedderInferConfig(BaseConfig):
             'embedder': {
                 'infer': {
                     'batch_size': self.batch_size,
-                    'use_pca': self.use_pca,
-                    'pca_model_path': self.pca_model_path,
-                    'pca_n_features': self.pca_n_features,
-                    'pca_n_patches': self.pca_n_patches,
                 }
             }
         }
@@ -116,6 +74,52 @@ class EmbedderInferIOConfig(BaseConfig):
         }
 
         return config
+
+
+@dataclass
+class SiameseInferConfig(EmbedderInferConfig):
+    checkpoint_path: str
+    architecture_config: EmbedderArchitectureConfig
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        parent_config = EmbedderInferConfig.from_dict(config)
+        embedder_infer_config = config['embedder']['infer']
+        siamese_config = embedder_infer_config['siamese']
+
+        return cls(
+            **parent_config.as_dict(),
+            checkpoint_path=siamese_config['checkpoint_path'],
+            architecture_config=EmbedderArchitectureConfig.from_dict(siamese_config['architecture']),
+        )
+
+    def to_structured_dict(self) -> dict:
+        config = super().to_structured_dict()
+        config['embedder']['infer']['siamese'] = {
+            'checkpoint_path': self.checkpoint_path,
+            'architecture': self.architecture_config.to_structured_dict(),
+        }
+
+        return config
+
+
+@dataclass
+class SiameseInferIOConfig(SiameseInferConfig, EmbedderInferIOConfig):
+    @classmethod
+    def from_dict(cls, config: dict):
+        embedder_infer_io_config = EmbedderInferIOConfig.from_dict(config)
+        siamese_config = DINOv2InferConfig.from_dict(config)
+
+        return cls(
+            **embedder_infer_io_config.as_dict(),
+            **siamese_config.as_dict(),
+        )
+
+    def to_structured_dict(self):
+        embedder_infer_io_config = EmbedderInferIOConfig.to_structured_dict(self)
+        siamese_config = SiameseInferConfig.to_structured_dict(self)
+        siamese_config['embedder']['infer']['io'] = embedder_infer_io_config['embedder']['infer']['io']
+        return siamese_config
 
 
 @dataclass

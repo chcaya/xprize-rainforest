@@ -77,6 +77,7 @@ class TilerizerIOConfig(TilerizerConfig):
     labels_path: str or None
     ignore_tiles_without_labels: bool
     main_label_category_column_name: str or None
+    other_labels_attributes_column_names: list or None
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -89,8 +90,9 @@ class TilerizerIOConfig(TilerizerConfig):
             raster_path=tilerizer_io_config['raster_path'],
             output_folder=tilerizer_io_config['output_folder'],
             labels_path=tilerizer_io_config['labels_path'],
-            ignore_tiles_without_labels=tilerizer_config['ignore_tiles_without_labels'],
-            main_label_category_column_name=tilerizer_config['main_label_category_column_name'],
+            ignore_tiles_without_labels=tilerizer_io_config['ignore_tiles_without_labels'],
+            main_label_category_column_name=tilerizer_io_config['main_label_category_column_name'],
+            other_labels_attributes_column_names=tilerizer_io_config['other_labels_attributes_column_names']
         )
 
     def to_structured_dict(self):
@@ -98,7 +100,8 @@ class TilerizerIOConfig(TilerizerConfig):
         config['tilerizer']['io'] = {
             'raster_path': self.raster_path,
             'output_folder': self.output_folder,
-            'labels_path': self.labels_path
+            'labels_path': self.labels_path,
+            'ignore_tiles_without_labels': self.ignore_tiles_without_labels,
+            'main_label_category_column_name': self.main_label_category_column_name,
+            'other_labels_attributes_column_names': self.other_labels_attributes_column_names
         }
-        config['tilerizer']['ignore_tiles_without_labels'] = self.ignore_tiles_without_labels
-        config['tilerizer']['main_label_category_column_name'] = self.main_label_category_column_name

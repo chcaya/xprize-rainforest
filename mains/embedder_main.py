@@ -1,10 +1,13 @@
 from pathlib import Path
 
 from geodataset.dataset import SegmentationLabeledRasterCocoDataset
+from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 from geodataset.utils import CocoNameConvention
 
-from config.config_parsers.embedder_parsers import DINOv2InferIOConfig, EmbedderInferIOConfig, DINOv2InferConfig
-from engine.embedder.dinov2 import DINOv2Inference
+from config.config_parsers.embedder_parsers import EmbedderInferIOConfig, DINOv2InferConfig, SiameseInferConfig, \
+    DINOv2InferIOConfig, SiameseInferIOConfig
+from engine.embedder.dinov2.dinov2 import DINOv2Inference
+from engine.embedder.siamese.siamese_infer import siamese_infer
 
 
 def dino_v2_infer_main(config: DINOv2InferConfig, segmentation_dataset: SegmentationLabeledRasterCocoDataset):
@@ -13,6 +16,16 @@ def dino_v2_infer_main(config: DINOv2InferConfig, segmentation_dataset: Segmenta
     embeddings = embedder.infer_on_segmentation_dataset(segmentation_dataset)
 
     return embeddings
+
+
+def siamese_infer_main(config: SiameseInferConfig, siamese_dataset: SiameseValidationDataset):
+    embeddings_df = siamese_infer(
+        siamese_dataset=siamese_dataset,
+        siamese_checkpoint=config.checkpoint_path,
+        batch_size=config.batch_size
+    )
+
+    return embeddings_df
 
 
 def embedder_infer_main(config: EmbedderInferIOConfig):
@@ -25,16 +38,17 @@ def embedder_infer_main(config: EmbedderInferIOConfig):
     assert tiles_path.is_dir() and tiles_path.name == "tiles", \
         "The tiles_path must be the path of a directory named 'tiles'."
 
-    segmentation_dataset = SegmentationLabeledRasterCocoDataset(
-        root_path=[
-            Path(config.coco_path).parent,
-            tiles_path.parent
-        ],
-        fold=fold
-    )
-
-    if isinstance(config, DINOv2InferConfig):
+    if isinstance(config, DINOv2InferIOConfig):
+        segmentation_dataset = SegmentationLabeledRasterCocoDataset(
+            root_path=[
+                Path(config.coco_path).parent,
+                tiles_path.parent
+            ],
+            fold=fold
+        )
         embeddings_df = dino_v2_infer_main(config=config, segmentation_dataset=segmentation_dataset)
+    elif isinstance(config, SiameseInferIOConfig):
+        embeddings_df = siamese_infer
     else:
         raise NotImplementedError
 

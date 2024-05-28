@@ -1,22 +1,24 @@
 from pathlib import Path
+from typing import List
 
 import joblib
+import numpy as np
 import torch
 from geodataset.utils import COCOGenerator, decode_rle_to_polygon, CocoNameConvention
+import pandas as pd
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2
 from engine.embedder.siamese.siamese_train import infer_model, valid_collate_fn
 from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 
 
-def siamese_classifier(data_roots, fold, siamese_checkpoint, scaler_checkpoint, svc_checkpoint, batch_size: int, product_name: str, ground_resolution: float, scale_factor: float, output_path: Path):
-    dataset = SiameseValidationDataset(
-        fold=fold,
-        root_path=[Path(root) for root in data_roots]
-    )
+def siamese_infer(siamese_dataset: SiameseValidationDataset, siamese_checkpoint: str, batch_size: int) -> pd.DataFrame:
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=3,
-                                         collate_fn=valid_collate_fn)
+    loader = torch.utils.data.DataLoader(
+        siamese_dataset,
+        batch_size=batch_size,
+        shuffle=False, num_workers=3,
+        collate_fn=valid_collate_fn)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -32,7 +34,40 @@ def siamese_classifier(data_roots, fold, siamese_checkpoint, scaler_checkpoint, 
     torch.cuda.reset_peak_memory_stats()
     torch.cuda.empty_cache()
 
-    print(labels.shape, embeddings.shape)
+    tiles_paths = [value["path"] for key, value in sorted(siamese_dataset.tiles.items(), key=lambda item: item[0])]
+
+    embeddings_df = pd.DataFrame({
+        'embeddings': embeddings.tolist(),
+        'labels': labels.tolist(),
+        'tiles_paths': tiles_paths
+    })
+
+    return embeddings_df
+
+
+def siamese_classifier(data_roots: str or List[str],
+                       fold: str,
+                       siamese_checkpoint: str,
+                       scaler_checkpoint: str,
+                       svc_checkpoint: str,
+                       batch_size: int,
+                       product_name: str,
+                       ground_resolution: float,
+                       scale_factor: float,
+                       output_path: Path):
+
+    siamese_dataset = SiameseValidationDataset(
+        fold=fold,
+        root_path=[Path(root) for root in data_roots]
+    )
+
+    embeddings_df = siamese_infer(
+        siamese_dataset=siamese_dataset,
+        siamese_checkpoint=siamese_checkpoint,
+        batch_size=batch_size
+    )
+
+    embeddings = np.vstack(embeddings_df['embeddings'].tolist())
 
     scaler = joblib.load(scaler_checkpoint)
     svc = joblib.load(svc_checkpoint)
@@ -40,9 +75,9 @@ def siamese_classifier(data_roots, fold, siamese_checkpoint, scaler_checkpoint, 
     X = scaler.transform(embeddings)
     preds = svc.predict(X)
 
-    tiles_paths = [value["path"] for key, value in sorted(dataset.tiles.items(), key=lambda item: item[0])]
+    tiles_paths = embeddings_df['tiles_paths']
 
-    segmentations = [[decode_rle_to_polygon(value["labels"][0]['segmentation'])] for key, value in sorted(dataset.tiles.items(), key=lambda item: item[0])]
+    segmentations = [[decode_rle_to_polygon(value["labels"][0]['segmentation'])] for key, value in sorted(siamese_dataset.tiles.items(), key=lambda item: item[0])]
 
     output_path.mkdir(parents=True, exist_ok=True)
 
