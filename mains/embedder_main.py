@@ -48,7 +48,18 @@ def embedder_infer_main(config: EmbedderInferIOConfig):
         )
         embeddings_df = dino_v2_infer_main(config=config, segmentation_dataset=segmentation_dataset)
     elif isinstance(config, SiameseInferIOConfig):
-        embeddings_df = siamese_infer
+        siamese_dataset = SiameseValidationDataset(
+            root_path=[
+                Path(config.coco_path).parent,
+                tiles_path.parent
+            ],
+            fold=fold
+        )
+
+        embeddings_df = siamese_infer_main(
+            config=config,
+            siamese_dataset=siamese_dataset
+        )
     else:
         raise NotImplementedError
 
