@@ -108,6 +108,8 @@ def _detector_infer_main_coco_output(config: DetectorInferIOConfig, infer_ds: Un
 
     coco_output_path = output_folder / f'{coco_output_name}'
 
+    other_attributes = [[{'detector_score': score} for score in scores] for scores in boxes_scores]
+
     print(f"Saving the box predictions to a COCO file (might take a while)...")
 
     coco_generator = COCOGenerator(description=f"Inference predictions for {raster_name}.",
@@ -115,7 +117,7 @@ def _detector_infer_main_coco_output(config: DetectorInferIOConfig, infer_ds: Un
                                    polygons=boxes,
                                    categories=None,
                                    scores=None,
-                                   other_attributes={'detector_score': boxes_scores},
+                                   other_attributes=other_attributes,
                                    output_path=coco_output_path,
                                    use_rle_for_labels=True,
                                    n_workers=config.coco_n_workers,
