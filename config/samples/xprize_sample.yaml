@@ -33,7 +33,7 @@ detector_config:
                 batch_size: 25
                 box_predictions_per_image: 250
             architecture:
-                architecture_name: 'basic'
+                architecture_name: 'fasterrcnn'
                 backbone_model_resnet_name: 'resnet50'
 
     aggregator:
