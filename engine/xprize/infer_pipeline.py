@@ -76,6 +76,7 @@ class XPrizePipeline:
             tiles_paths=detector_tiles_paths,
             polygons=detector_polygons,
             polygons_scores={'detector_score': detector_polygons_scores},
+            polygons_scores_weights={'detector_score': 1.0},
             output_path=detector_aggregator_output_path
         )
 
@@ -152,6 +153,7 @@ class XPrizePipeline:
             polygons=segmenter_masks,
             polygons_scores={'detector_score': segmenter_boxes_scores,
                              'segmenter_score': segmenter_masks_scores},
+            polygons_scores_weights={'detector_score': 3.0, 'segmenter_score': 1.0},        # TODO THIS DOESNT WORK AS EXPECTED (3 * 1 * score_detector * score_segmenter scales all the results the same (* 3))
             output_path=segmenter_aggregator_output_path
         )
 
