@@ -65,15 +65,16 @@ segmenter_config:
         }
 
     segmenter:
-        model_type: 'vit_l'
-        checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
-        simplify_tolerance: 1.0
-        box_padding_percentage: 0.00
+        infer:
+            model_type: 'vit_l'
+            checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
+            simplify_tolerance: 1.0
+            box_padding_percentage: 0.00
 
 
     aggregator:
         polygon_type: 'segmentation'
-        score_threshold: 0.35
+        score_threshold: 0.05
         nms_threshold: 0.5
         nms_algorithm: 'iou'
 

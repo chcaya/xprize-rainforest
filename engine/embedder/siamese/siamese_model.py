@@ -42,7 +42,7 @@ class ContrastiveLoss(torch.nn.Module):
         self.margin = margin        # TODO this is currently fixed and not using the value coming from the dataset
 
     def forward(self, output1, output2, label):
-        euclidean_distance = F.pairwise_distance(output1, output2)
+        euclidean_distance = F.pairwise_distance(output1, output2)                                                              # try euclidean distance vs cosine similarity
 
         positive_loss = label * torch.pow(euclidean_distance, 2)
         negative_loss = (1 - label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2)

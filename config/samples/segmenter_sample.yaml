@@ -1,10 +1,16 @@
 segmenter:
-    io:
-      input_tiles_root: 'Data\pre_processed\all_datasets\quebec_trees\2021_09_02_sbl_z1_rgb_cog\tiles'
-      coco_path: '.\output\test\aggregator3\2021_09_02_sbl_z1_rgb_cog_coco_sf1p0_inferaggregator.json'
-      output_folder: './output/test/segmenter1'
-    model_type: 'vit_l'
-    checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
-    simplify_tolerance: 1.0
-    box_padding_percentage: 0.00
+    infer:
+        io:
+          input_tiles_root: 'Data\pre_processed\all_datasets\quebec_trees\2021_09_02_sbl_z1_rgb_cog\tiles'
+          coco_path: '.\output\test\aggregator3\2021_09_02_sbl_z1_rgb_cog_coco_sf1p0_inferaggregator.json'
+          output_folder: './output/test/segmenter1'
+        model_type: 'vit_l'
+        checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
+        simplify_tolerance: 1.0
+        box_padding_percentage: 0.00
+    score:
+        io:
+          truth_geopackage_path: ''
+          predictions_geopackage_path: ''
+          class_column_name: 'class'
 

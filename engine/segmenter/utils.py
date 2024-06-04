@@ -74,8 +74,11 @@ def mask_to_polygon(mask: np.ndarray, simplify_tolerance: float = 1.0) -> Polygo
     if mask.ndim != 2:
         raise ValueError("Mask must be in HW format (2D array).")
 
+    # Pad the mask to avoid boundary issues
+    padded_mask = np.pad(mask, pad_width=1, mode='constant', constant_values=0)
+
     # Find contours on the mask, assuming mask is binary
-    contours = find_contours(mask, 0.5)  # Use 0.5 as level to find contours
+    contours = find_contours(padded_mask, 0.5)
 
     if len(contours) == 0:
         # returning empty, dummy polygon at 0,0
@@ -85,10 +88,11 @@ def mask_to_polygon(mask: np.ndarray, simplify_tolerance: float = 1.0) -> Polygo
     longest_contour = max(contours, key=len)
 
     # Convert contour coordinates from (row, column) to (x, y)
-    longest_contour_xy = [(y, x) for x, y in longest_contour]
+    # and revert the padding added to the mask
+    longest_contour_adjusted_xy = [(y - 1, x - 1) for x, y in longest_contour]
 
     # Convert contour to Polygon
-    polygon = Polygon(longest_contour_xy)
+    polygon = Polygon(longest_contour_adjusted_xy)
 
     # Simplify the polygon
     simplified_polygon = polygon.simplify(tolerance=simplify_tolerance, preserve_topology=True)
