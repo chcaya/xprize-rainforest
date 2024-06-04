@@ -1,11 +1,13 @@
 from pathlib import Path
 
+import geopandas as gpd
 import torch
 from geodataset.dataset import DetectionLabeledRasterCocoDataset
 from geodataset.utils import CocoNameConvention, COCOGenerator
 
-from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
+from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig, SegmenterScoreIOConfig
 from engine.segmenter.sam import SamPredictorWrapper
+from engine.segmenter.metrics import Evaluator
 
 
 def segmenter_infer_main(config: SegmenterInferIOConfig):
@@ -101,3 +103,24 @@ def _segmenter_infer_main_polygons_output(config: SegmenterInferIOConfig):
 
     return tiles_paths, masks, masks_scores, segmenter_boxes_scores
 
+
+def segmenter_score_main(config: SegmenterScoreIOConfig):
+    truths = gpd.read_file(config.truth_geopackage_path)
+    predictions = gpd.read_file(config.predictions_geopackage_path)
+
+    assert config.class_column_name in truths.columns, f"Column '{config.class_column_name}' not found in the truth geopackage."
+    assert config.class_column_name in predictions.columns, f"Column '{config.class_column_name}' not found in the predictions geopackage."
+
+    n_classes = len(truths[config.class_column_name].unique())
+
+    evaluator = Evaluator(task='segmentation',
+                          metric_names=['accuracy', 'precision', 'recall', 'miou', 'dice'],
+                          device='cuda:0' if torch.cuda.is_available() else 'cpu',
+                          seg_n_classes=n_classes
+                          )
+
+    truths_pixels = evaluator.vector_to_pixels(truths, config.class_column_name)
+
+    evaluator.add_batch(truths, predictions)
+
+    return masks_scores

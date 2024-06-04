@@ -12,7 +12,8 @@ def aggregator_main_with_polygons_input(config: AggregatorConfig,
                                         output_path: str,
                                         tiles_paths: List[Path],
                                         polygons: List[List[Polygon]],
-                                        polygons_scores: Dict[str, List[List[float]]]):
+                                        polygons_scores: Dict[str, List[List[float]]],
+                                        polygons_scores_weights: Dict[str, float] or None):
     output_path = Path(output_path)
     output_folder = output_path.parent
     output_folder.mkdir(exist_ok=False, parents=True)
@@ -25,6 +26,7 @@ def aggregator_main_with_polygons_input(config: AggregatorConfig,
             tiles_paths=tiles_paths,
             polygons=polygons,
             scores=polygons_scores,
+            scores_weights=polygons_scores_weights,
             score_threshold=config.score_threshold,
             nms_threshold=config.nms_threshold,
             nms_algorithm=config.nms_algorithm
@@ -35,6 +37,7 @@ def aggregator_main_with_polygons_input(config: AggregatorConfig,
             tiles_paths=tiles_paths,
             polygons=polygons,
             scores=polygons_scores,
+            scores_weights=polygons_scores_weights,
             score_threshold=config.score_threshold,
             nms_threshold=config.nms_threshold,
             nms_algorithm=config.nms_algorithm
