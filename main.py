@@ -1,7 +1,7 @@
 import argparse
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
-from config.config_parsers.coco_to_geojson_parsers import CocoToGeojsonIOConfig
+from config.config_parsers.coco_to_geopackage_parsers import CocoToGeopackageIOConfig
 from config.config_parsers.detector_parsers import DetectorScoreIOConfig, DetectorInferIOConfig, \
     DetectorTrainIOConfig
 from config.config_parsers.embedder_parsers import DINOv2InferIOConfig
@@ -10,7 +10,7 @@ from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
 from config.config_parsers.xprize_parsers import XPrizeIOConfig
 from mains import *
 from mains.aggregator_main import aggregator_main_with_coco_input
-from mains.coco_to_geojson_main import coco_to_geojson_main
+from mains.coco_to_geopackage_main import coco_to_geopackage_main
 from mains.detector_mains import detector_infer_main
 from mains.embedder_main import embedder_infer_main
 from mains.segmenter_main import segmenter_infer_main, segmenter_score_main
@@ -51,9 +51,9 @@ if __name__ == "__main__":
     elif task == "segmenter" and subtask == "score":
         config = SegmenterScoreIOConfig.from_config_path(config_path)
         segmenter_score_main(config)
-    elif task == "coco_to_geojson":
-        config = CocoToGeojsonIOConfig.from_config_path(config_path)
-        coco_to_geojson_main(config)
+    elif task == "coco_to_geopackage":
+        config = CocoToGeopackageIOConfig.from_config_path(config_path)
+        coco_to_geopackage_main(config)
     elif task == "embedder" and subtask == "infer":
         config = DINOv2InferIOConfig.from_config_path(config_path)
         embedder_infer_main(config)
