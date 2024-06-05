@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+def sam_collate_fn(single_image_batch):
+    return single_image_batch[0]
+
+
 def display_image_with_mask_and_box(image: np.ndarray, mask: np.ndarray, image_box: box, mask_alpha: float = 0.5,
                                     additional_polygons: list[Polygon] = None):
     """

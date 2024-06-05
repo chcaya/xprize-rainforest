@@ -10,6 +10,7 @@ class SegmenterInferConfig(BaseConfig):
     checkpoint_path: str
     simplify_tolerance: float
     box_padding_percentage: float
+    n_postprocess_workers: int
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -19,7 +20,8 @@ class SegmenterInferConfig(BaseConfig):
             model_type=segmenter_config['model_type'],
             checkpoint_path=segmenter_config['checkpoint_path'],
             simplify_tolerance=segmenter_config['simplify_tolerance'],
-            box_padding_percentage=segmenter_config['box_padding_percentage']
+            box_padding_percentage=segmenter_config['box_padding_percentage'],
+            n_postprocess_workers=segmenter_config['n_postprocess_workers']
         )
 
     def to_structured_dict(self):
@@ -30,6 +32,7 @@ class SegmenterInferConfig(BaseConfig):
                     'checkpoint_path': self.checkpoint_path,
                     'simplify_tolerance': self.simplify_tolerance,
                     'box_padding_percentage': self.box_padding_percentage,
+                    'n_postprocess_workers': self.n_postprocess_workers
                 }
             }
         }
