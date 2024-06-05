@@ -70,6 +70,7 @@ segmenter_config:
             checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
             simplify_tolerance: 1.0
             box_padding_percentage: 0.00
+            n_postprocess_workers: 16
 
 
     aggregator:
