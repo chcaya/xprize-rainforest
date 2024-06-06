@@ -1,5 +1,5 @@
-coco_to_geojson:
+coco_to_geopackage:
     io:
         input_tiles_root: Data/pre_processed/all_datasets/quebec_trees/2021_09_02_sbl_z1_rgb_cog/tiles
         coco_path: Data/pre_processed/all_datasets/quebec_trees/2021_09_02_sbl_z1_rgb_cog/2021_09_02_sbl_z1_rgb_cog_coco_gr0p05_train.json
-        output_folder: ./output/coco_to_geojson
+        output_folder: ./output/coco_to_geopackage

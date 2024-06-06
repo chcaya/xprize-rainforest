@@ -58,30 +58,6 @@ class SamPredictorWrapper:
                                                                     multimask_output=False)
         return masks, scores
 
-    def infer_on_single_box_dataset(self, boxes_dataset: BoxesDataset, geojson_output_path: str):
-        mask_polygons = []
-        dataset_with_progress = tqdm(boxes_dataset,
-                                     desc="Inferring SAM...",
-                                     leave=True)
-        for image, box, (minx, miny) in dataset_with_progress:
-            image = image[:3, :, :]
-            image_hwc = image.transpose((1, 2, 0))
-            masks = self._infer(image=image_hwc, boxes=[box.bounds])
-
-            mask_polygon = mask_to_polygon(masks.squeeze(), simplify_tolerance=self.simplify_tolerance)
-
-            adjusted_mask_polygon = translate(mask_polygon, xoff=minx, yoff=miny)
-            mask_polygons.append(adjusted_mask_polygon)
-
-        gdf = GeoDataFrame(geometry=mask_polygons)
-        gdf['geometry'] = gdf['geometry'].astype(object).apply(
-            lambda geom: apply_affine_transform(geom, boxes_dataset.raster.metadata['transform'])
-        )
-        gdf.set_crs(boxes_dataset.raster.metadata['crs'], inplace=True)
-        gdf.to_file(geojson_output_path, driver='GeoJSON')
-
-        return gdf
-
     def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset):
         infer_dl = DataLoader(dataset, batch_size=1, shuffle=False,
                               collate_fn=sam_collate_fn,

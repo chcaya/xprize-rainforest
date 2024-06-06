@@ -6,7 +6,7 @@ from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 from geodataset.utils import strip_all_extensions
 from geodataset.utils.file_name_conventions import validate_and_convert_product_name, CocoNameConvention
 
-from config.config_parsers.coco_to_geojson_parsers import CocoToGeojsonIOConfig
+from config.config_parsers.coco_to_geopackage_parsers import CocoToGeopackageIOConfig
 from config.config_parsers.detector_parsers import DetectorInferIOConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from config.config_parsers.tilerizer_parsers import TilerizerIOConfig, TilerizerConfig
@@ -14,7 +14,7 @@ from config.config_parsers.xprize_parsers import XPrizeIOConfig
 from engine.embedder.siamese.siamese_infer import siamese_classifier
 from mains import tilerizer_main
 from mains.aggregator_main import aggregator_main_with_polygons_input
-from mains.coco_to_geojson_main import coco_to_geojson_main
+from mains.coco_to_geopackage_main import coco_to_geopackage_main
 from mains.detector_mains import detector_infer_main
 from mains.embedder_main import siamese_infer_main
 from mains.segmenter_main import segmenter_infer_main
@@ -81,13 +81,13 @@ class XPrizePipeline:
         )
 
         # Converting aggregated trees from coco to geojson
-        coco_to_geojson_config = self._get_coco_to_geojson_config(
+        coco_to_geopackage_config = self._get_coco_to_geopackage_config(
             input_tiles_root=detector_tiles_path,
             coco_path=detector_aggregator_output_path,
             output_folder=self.detector_aggregator_output_folder
         )
-        _, detector_aggregator_geojson_path = coco_to_geojson_main(
-            config=coco_to_geojson_config
+        _, detector_aggregator_geojson_path = coco_to_geopackage_main(
+            config=coco_to_geopackage_config
         )
 
         if asdict(self.config.detector_tilerizer_config) == asdict(self.config.segmenter_tilerizer_config):
@@ -158,13 +158,13 @@ class XPrizePipeline:
         )
 
         # Converting aggregated trees masks from coco to geojson
-        coco_to_geojson_config = self._get_coco_to_geojson_config(
+        coco_to_geopackage_config = self._get_coco_to_geopackage_config(
             input_tiles_root=segmenter_tiles_path,
             coco_path=segmenter_aggregator_output_path,
             output_folder=self.segmenter_aggregator_output_folder
         )
-        tree_segments_gdf, segmenter_aggregator_geojson_path = coco_to_geojson_main(
-            config=coco_to_geojson_config
+        tree_segments_gdf, segmenter_aggregator_geojson_path = coco_to_geopackage_main(
+            config=coco_to_geopackage_config
         )
 
         # Tilerizing the final dataset for the siamese classifier, with one tree per tile
@@ -201,13 +201,13 @@ class XPrizePipeline:
             scale_factor=self.config.classifier_tilerizer_config.raster_resolution_config.scale_factor,
             output_path=self.classifier_output_folder
         )
-        coco_to_geojson_config = self._get_coco_to_geojson_config(
+        coco_to_geopackage_config = self._get_coco_to_geopackage_config(
             input_tiles_root=embedder_tiles_path,
             coco_path=classifier_coco_path,
             output_folder=self.classifier_output_folder
         )
-        tree_segments_classified_gdf, classifier_geojson_path = coco_to_geojson_main(
-            config=coco_to_geojson_config
+        tree_segments_classified_gdf, classifier_geojson_path = coco_to_geopackage_main(
+            config=coco_to_geopackage_config
         )
 
         end_time = time.time()
@@ -251,16 +251,16 @@ class XPrizePipeline:
         return detector_infer_config
 
     @staticmethod
-    def _get_coco_to_geojson_config(input_tiles_root: Path,
+    def _get_coco_to_geopackage_config(input_tiles_root: Path,
                                     coco_path: Path,
                                     output_folder: Path):
-        coco_to_geojson_config = CocoToGeojsonIOConfig(
+        coco_to_geopackage_config = CocoToGeopackageIOConfig(
             input_tiles_root=str(input_tiles_root),
             coco_path=str(coco_path),
             output_folder=str(output_folder),
         )
 
-        return coco_to_geojson_config
+        return coco_to_geopackage_config
 
     def _get_segmenter_infer_config(self,
                                     tiles_path: Path,
