@@ -97,7 +97,7 @@ class XPrizePipeline:
             # Predicting tree instance segmentations
             segmenter_config = self._get_segmenter_infer_config(
                 tiles_path=detector_tiles_path,
-                coco_path=detector_aggregator_output_file
+                coco_path=detector_aggregator_output_path
             )
             segmenter_output = segmenter_infer_main(
                 config=segmenter_config
@@ -252,8 +252,8 @@ class XPrizePipeline:
 
     @staticmethod
     def _get_coco_to_geopackage_config(input_tiles_root: Path,
-                                    coco_path: Path,
-                                    output_folder: Path):
+                                       coco_path: Path,
+                                       output_folder: Path):
         coco_to_geopackage_config = CocoToGeopackageIOConfig(
             input_tiles_root=str(input_tiles_root),
             coco_path=str(coco_path),
