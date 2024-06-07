@@ -90,48 +90,49 @@ class XPrizePipeline:
             config=coco_to_geopackage_config
         )
 
-        if asdict(self.config.detector_tilerizer_config) == asdict(self.config.segmenter_tilerizer_config):
-            # The tilerizer configs are the same for the detector and the segmenter, so no need to re-tilerize and re-run the aggregator.
-            print("Skipping the segmenter tilerizer as the detector and segmenter tilerizer configs are the same.")
+        # if asdict(self.config.detector_tilerizer_config) == asdict(self.config.segmenter_tilerizer_config):
+        #     # The tilerizer configs are the same for the detector and the segmenter, so no need to re-tilerize and re-run the aggregator.
+        #     print("Skipping the segmenter tilerizer as the detector and segmenter tilerizer configs are the same.")
+        #
+        #     # Predicting tree instance segmentations
+        #     segmenter_config = self._get_segmenter_infer_config(
+        #         tiles_path=detector_tiles_path,
+        #         coco_path=detector_aggregator_output_path
+        #     )
+        #     segmenter_output = segmenter_infer_main(
+        #         config=segmenter_config
+        #     )
+        #
+        #     segmenter_tiles_path = detector_tiles_path
+        #     segmenter_scale_factor = detector_tilerizer_config.raster_resolution_config.scale_factor
+        #     segmenter_ground_resolution = detector_tilerizer_config.raster_resolution_config.ground_resolution
+        #
+        # else:
 
-            # Predicting tree instance segmentations
-            segmenter_config = self._get_segmenter_infer_config(
-                tiles_path=detector_tiles_path,
-                coco_path=detector_aggregator_output_path
-            )
-            segmenter_output = segmenter_infer_main(
-                config=segmenter_config
-            )
+        # Creating tiles for the segmenter as the tilerizer configs are different for the detector and segmenter
+        # TODO add a boolean parameter to Tilerizer to avoid duplicating boxes/segments (for each box it should find out what is the appropriate tile based on tiles centroids and borders intersections)
+        segmenter_tilerizer_config = self._get_tilerizer_config(
+            tilerizer_config=self.config.segmenter_tilerizer_config,
+            output_folder=self.segmenter_tilerizer_output_folder,
+            labels_path=detector_aggregator_geojson_path,
+            main_label_category_column_name=None,
+            other_labels_attributes_column_names=['detector_score']
+        )
+        segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(
+            config=segmenter_tilerizer_config
+        )
+        segmenter_coco_path = segmenter_coco_paths[list(self.config.segmenter_tilerizer_config.aois.keys())[0]]
 
-            segmenter_tiles_path = detector_tiles_path
-            segmenter_scale_factor = detector_tilerizer_config.raster_resolution_config.scale_factor
-            segmenter_ground_resolution = detector_tilerizer_config.raster_resolution_config.ground_resolution
-
-        else:
-            # Creating tiles for the segmenter as the tilerizer configs are different for the detector and segmenter
-            # TODO add a boolean parameter to Tilerizer to avoid duplicating boxes/segments (for each box it should find out what is the appropriate tile based on tiles centroids and borders intersections)
-            segmenter_tilerizer_config = self._get_tilerizer_config(
-                tilerizer_config=self.config.segmenter_tilerizer_config,
-                output_folder=self.segmenter_tilerizer_output_folder,
-                labels_path=detector_aggregator_geojson_path,
-                main_label_category_column_name=None,
-                other_labels_attributes_column_names=['detector_score']
-            )
-            segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(
-                config=segmenter_tilerizer_config
-            )
-            segmenter_coco_path = segmenter_coco_paths[list(self.config.segmenter_tilerizer_config.aois.keys())[0]]
-
-            # Predicting tree instance segmentations
-            segmenter_config = self._get_segmenter_infer_config(
-                tiles_path=segmenter_tiles_path,
-                coco_path=segmenter_coco_path
-            )
-            segmenter_output = segmenter_infer_main(
-                config=segmenter_config
-            )
-            segmenter_scale_factor = segmenter_tilerizer_config.raster_resolution_config.scale_factor
-            segmenter_ground_resolution = segmenter_tilerizer_config.raster_resolution_config.ground_resolution
+        # Predicting tree instance segmentations
+        segmenter_config = self._get_segmenter_infer_config(
+            tiles_path=segmenter_tiles_path,
+            coco_path=segmenter_coco_path
+        )
+        segmenter_output = segmenter_infer_main(
+            config=segmenter_config
+        )
+        segmenter_scale_factor = segmenter_tilerizer_config.raster_resolution_config.scale_factor
+        segmenter_ground_resolution = segmenter_tilerizer_config.raster_resolution_config.ground_resolution
 
         if self.config.save_segmenter_intermediate_output:
             segmenter_tiles_paths, segmenter_masks, segmenter_masks_scores, segmenter_boxes_scores, segmenter_output_file = segmenter_output
