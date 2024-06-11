@@ -1,0 +1,40 @@
+pipeline_classifier:
+    io:
+        raster_path: ''
+        segmentations_geopackage_path: ''
+        output_folder: ''
+
+    tilerizer:
+        tile_type: 'polygon'
+        tile_size: 256
+        tile_overlap: null
+        raster_resolution:
+            scale_factor: null
+            ground_resolution: 0.05
+        ignore_black_white_alpha_tiles_threshold: null
+        area_of_interest: {
+            aoi_config: 'generate',
+            aoi_type: 'band',
+            aois: {
+              'infer': {
+                'percentage': 1.0,
+                'position': 1
+              }
+            }
+        }
+
+    embedder:
+        infer:
+            batch_size: 16
+            siamese:
+                checkpoint_path: 'models/siamese_classifier/checkpoint_0_20000.pth'
+                architecture:
+                    architecture_name: 'siamese'
+                    backbone_model_resnet_name: 'resnet50'
+
+    classifier:
+        infer:
+            scaler_checkpoint_path: 'models/siamese_classifier/scaler.joblib'
+            classifier_checkpoint_path: 'models/siamese_classifier/svc.joblib'
+            architecture:
+                architecture_name: 'svm'

@@ -3,7 +3,7 @@ io:
     output_folder: './output/test/sbl_test_run'
     coco_n_workers: 5
 
-detector_config:
+pipeline_detector:
     save_detector_intermediate_output: false
 
     tilerizer:
@@ -42,7 +42,7 @@ detector_config:
         nms_threshold: 0.7
         nms_algorithm: 'iou'
 
-segmenter_config:
+pipeline_segmenter:
     save_segmenter_intermediate_output: false
 
     tilerizer:
@@ -71,6 +71,7 @@ segmenter_config:
             simplify_tolerance: 1.0
             box_padding_percentage: 0.00
             n_postprocess_workers: 16
+            box_batch_size: 500
 
 
     aggregator:
@@ -79,7 +80,7 @@ segmenter_config:
         nms_threshold: 0.5
         nms_algorithm: 'iou'
 
-classifier_config:
+pipeline_classifier:
     tilerizer:
         tile_type: 'polygon'
         tile_size: 1024

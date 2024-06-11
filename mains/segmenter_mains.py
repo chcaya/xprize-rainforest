@@ -79,7 +79,8 @@ def _segmenter_infer_main_polygons_output(config: SegmenterInferIOConfig):
         model_type=config.model_type,
         checkpoint_path=config.checkpoint_path,
         simplify_tolerance=config.simplify_tolerance,
-        n_postprocess_workers=config.n_postprocess_workers
+        n_postprocess_workers=config.n_postprocess_workers,
+        box_batch_size=config.box_batch_size
     )
 
     tiles_paths, masks, masks_scores = sam.infer_on_multi_box_dataset(dataset=dataset)
