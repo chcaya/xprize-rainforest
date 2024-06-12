@@ -22,6 +22,8 @@ def siamese_infer_main(config: SiameseInferConfig, siamese_dataset: SiameseValid
     embeddings_df = siamese_infer(
         siamese_dataset=siamese_dataset,
         siamese_checkpoint=config.checkpoint_path,
+        backbone_model_resnet_name=config.architecture_config.backbone_model_resnet_name,
+        final_embedding_size=config.architecture_config.final_embedding_size,
         batch_size=config.batch_size
     )
 
