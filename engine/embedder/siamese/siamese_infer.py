@@ -12,7 +12,11 @@ from engine.embedder.siamese.siamese_train import infer_model, valid_collate_fn
 from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 
 
-def siamese_infer(siamese_dataset: SiameseValidationDataset, siamese_checkpoint: str, batch_size: int) -> pd.DataFrame:
+def siamese_infer(siamese_dataset: SiameseValidationDataset,
+                  siamese_checkpoint: str,
+                  backbone_model_resnet_name: str,
+                  final_embedding_size: int,
+                  batch_size: int) -> pd.DataFrame:
 
     loader = torch.utils.data.DataLoader(
         siamese_dataset,
@@ -22,7 +26,7 @@ def siamese_infer(siamese_dataset: SiameseValidationDataset, siamese_checkpoint:
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = SiameseNetwork2()
+    model = SiameseNetwork2(resnet_model=backbone_model_resnet_name, final_embedding_size=final_embedding_size)
     print(f'Loading model from {siamese_checkpoint}')
     weights = torch.load(siamese_checkpoint)
     model.load_state_dict(weights)
@@ -51,6 +55,8 @@ def siamese_classifier(data_roots: str or List[str],
                        scaler_checkpoint: str,
                        svc_checkpoint: str,
                        batch_size: int,
+                       backbone_model_resnet_name: str,
+                       final_embedding_size: int,
                        product_name: str,
                        ground_resolution: float,
                        scale_factor: float,
@@ -64,6 +70,8 @@ def siamese_classifier(data_roots: str or List[str],
     embeddings_df = siamese_infer(
         siamese_dataset=siamese_dataset,
         siamese_checkpoint=siamese_checkpoint,
+        backbone_model_resnet_name=backbone_model_resnet_name,
+        final_embedding_size=final_embedding_size,
         batch_size=batch_size
     )
 

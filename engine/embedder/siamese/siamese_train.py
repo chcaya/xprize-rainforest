@@ -134,6 +134,8 @@ def valid_collate_fn(batch):
 
 
 if __name__ == '__main__':
+    resnet_model = 'resnet50'
+    final_embedding_size = 1024
 
     train_dataset_quebec = SiameseSamplerInternalDataset(
         fold='train',
@@ -204,7 +206,7 @@ if __name__ == '__main__':
                                                      collate_fn=valid_collate_fn)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = SiameseNetwork2().to(device)
+    model = SiameseNetwork2(resnet_model=resnet_model, final_embedding_size=final_embedding_size).to(device)
     criterion = ContrastiveLoss(margin=1.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.3)      # TODO adjust this

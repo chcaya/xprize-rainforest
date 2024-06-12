@@ -7,6 +7,7 @@ from config.config_parsers.base_config_parsers import BaseConfig, BaseIntermedia
 class EmbedderArchitectureConfig(BaseIntermediateConfig):
     architecture_name: str
     backbone_model_resnet_name: str
+    final_embedding_size: int
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -16,6 +17,7 @@ class EmbedderArchitectureConfig(BaseIntermediateConfig):
         config = {
             'architecture_name': self.architecture_name,
             'backbone_model_resnet_name': self.backbone_model_resnet_name,
+            'final_embedding_size': self.final_embedding_size,
         }
 
         return config
@@ -97,7 +99,7 @@ class SiameseInferConfig(EmbedderInferConfig):
         config = super().to_structured_dict()
         config['embedder']['infer']['siamese'] = {
             'checkpoint_path': self.checkpoint_path,
-            'architecture': self.architecture_config.to_structured_dict(),
+            'architecture': self.architecture_config.to_structured_dict()
         }
 
         return config

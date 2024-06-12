@@ -49,6 +49,8 @@ class PipelineClassifier(BaseRasterPipeline):
             scaler_checkpoint=self.config.classifier_infer_config.scaler_checkpoint_path,
             svc_checkpoint=self.config.classifier_infer_config.classifier_checkpoint_path,
             batch_size=self.config.classifier_embedder_config.batch_size,
+            backbone_model_resnet_name=self.config.classifier_embedder_config.architecture_config.backbone_model_resnet_name,
+            final_embedding_size=self.config.classifier_embedder_config.architecture_config.final_embedding_size,
             product_name=self.raster_name,
             ground_resolution=self.config.classifier_tilerizer_config.raster_resolution_config.ground_resolution,
             scale_factor=self.config.classifier_tilerizer_config.raster_resolution_config.scale_factor,

@@ -5,10 +5,20 @@ import torch.nn.functional as F
 
 
 class SiameseNetwork2(nn.Module):
-    def __init__(self):
+    def __init__(self, resnet_model: str, final_embedding_size: int):
         super(SiameseNetwork2, self).__init__()
         # Load a ResNet50 model pre-trained on ImageNet
-        self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)            # TODO try bigger models as backbone!!!
+        if resnet_model == 'resnet50':
+            self.backbone = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        elif resnet_model == 'resnet101':
+            self.backbone = models.resnet101(weights=models.ResNet101_Weights.DEFAULT)
+        elif resnet_model == 'resnet152':
+            self.backbone = models.resnet152(weights=models.ResNet152_Weights.DEFAULT)
+        else:
+            raise ValueError(f'Invalid resnet model: {resnet_model}')
+
+        self.final_embedding_size = final_embedding_size
+
         # Remove the final fully connected layer
         self.backbone.fc = nn.Identity()
 
@@ -16,7 +26,7 @@ class SiameseNetwork2(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(2048, 1536),
             nn.ReLU(),
-            nn.Linear(1536, 1024),
+            nn.Linear(1536, self.final_embedding_size),
         )
 
     def forward(self, x1, x2):

@@ -31,6 +31,7 @@ pipeline_classifier:
                 architecture:
                     architecture_name: 'siamese'
                     backbone_model_resnet_name: 'resnet50'
+                    final_embedding_size: 1024
 
     classifier:
         infer:
