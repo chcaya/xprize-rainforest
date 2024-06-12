@@ -1,4 +1,5 @@
 import argparse
+import multiprocessing
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
 from config.config_parsers.coco_to_geopackage_parsers import CocoToGeopackageIOConfig
@@ -7,16 +8,20 @@ from config.config_parsers.detector_parsers import DetectorScoreIOConfig, Detect
 from config.config_parsers.embedder_parsers import DINOv2InferIOConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
-from config.config_parsers.xprize_parsers import XPrizeIOConfig
-from mains import *
-from mains.aggregator_main import aggregator_main_with_coco_input
-from mains.coco_to_geopackage_main import coco_to_geopackage_main
-from mains.detector_mains import detector_infer_main
-from mains.embedder_main import embedder_infer_main
-from mains.segmenter_main import segmenter_infer_main, segmenter_score_main
+from config.config_parsers.pipeline_parsers import PipelineXPrizeIOConfig, PipelineSegmenterIOConfig, \
+    PipelineDetectorIOConfig, PipelineClassifierIOConfig
 
+from mains import *
+from mains.aggregator_mains import aggregator_main_with_coco_input
+from mains.coco_to_geopackage_mains import coco_to_geopackage_main
+from mains.detector_mains import detector_infer_main
+from mains.embedder_mains import embedder_infer_main
+from mains.segmenter_mains import segmenter_infer_main, segmenter_score_main
+from mains.tilerizer_mains import tilerizer_main
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method('spawn')
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, help="The task to perform.")
     parser.add_argument("--subtask", type=str, help="The subtask of the task to perform.")
@@ -27,10 +32,19 @@ if __name__ == "__main__":
     subtask = args.subtask
     config_path = args.config_path
 
-    if task == "xprize":
-        config = XPrizeIOConfig.from_config_path(config_path)
-        xprize_main(config)
-    if task == "tilerizer":
+    if task == "pipeline" and subtask == "xprize":
+        config = PipelineXPrizeIOConfig.from_config_path(config_path)
+        pipeline_xprize_main(config)
+    elif task == "pipeline" and subtask == "segmenter":
+        config = PipelineSegmenterIOConfig.from_config_path(config_path)
+        pipeline_segmenter_main(config)
+    elif task == "pipeline" and subtask == "detector":
+        config = PipelineDetectorIOConfig.from_config_path(config_path)
+        pipeline_detector_main(config)
+    elif task == "pipeline" and subtask == "classifier":
+        config = PipelineClassifierIOConfig.from_config_path(config_path)
+        pipeline_classifier_main(config)
+    elif task == "tilerizer":
         config = TilerizerIOConfig.from_config_path(config_path)
         tilerizer_main(config)
     elif task == "detector" and subtask == "train":

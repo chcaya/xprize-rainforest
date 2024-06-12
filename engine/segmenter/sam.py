@@ -1,21 +1,25 @@
-from collections import OrderedDict
-from functools import partial
+import time
 from typing import List
 
 import numpy as np
+import psutil
 import torch
-from geodataset.dataset import BoxesDataset, DetectionLabeledRasterCocoDataset
-from geodataset.utils import apply_affine_transform
-from geopandas import GeoDataFrame
+from geodataset.dataset import DetectionLabeledRasterCocoDataset
 import multiprocessing
 
 from segment_anything import SamPredictor, sam_model_registry
 
-from shapely.affinity import translate
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from engine.segmenter.utils import mask_to_polygon, sam_collate_fn
+
+
+def get_memory_usage():
+    memory_info = psutil.virtual_memory()
+    memory_percentage = memory_info.percent
+
+    return memory_percentage
 
 
 def process_masks(queue, output_dict, simplify_tolerance):
@@ -38,11 +42,13 @@ class SamPredictorWrapper:
                  model_type: str,
                  checkpoint_path: str,
                  simplify_tolerance: float,
-                 n_postprocess_workers: int):
+                 n_postprocess_workers: int,
+                 box_batch_size: int):
         self.model_type = model_type
         self.checkpoint_path = checkpoint_path
         self.simplify_tolerance = simplify_tolerance
         self.n_postprocess_workers = n_postprocess_workers
+        self.box_batch_size = box_batch_size
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         sam = sam_model_registry[self.model_type](checkpoint=self.checkpoint_path)
         sam.to(self.device)
@@ -51,12 +57,26 @@ class SamPredictorWrapper:
     def _infer(self, image: np.ndarray, boxes: List[np.array]):
         self.predictor.set_image(image)
         box_array = np.array(boxes)
-        box_tensor = torch.Tensor(box_array).to(self.device).to(torch.long)
-        masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
-                                                                    point_labels=None,
-                                                                    boxes=box_tensor,
-                                                                    multimask_output=False)
-        return masks, scores
+        box_tensor = torch.Tensor(box_array).to(torch.long)
+
+        all_masks = []
+        all_scores = []
+
+        for i in range(0, len(box_tensor), self.box_batch_size):
+            box_batch = box_tensor[i:i + self.box_batch_size].to(self.device)
+            masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
+                                                                        point_labels=None,
+                                                                        boxes=box_batch,
+                                                                        multimask_output=False)
+            masks, scores = masks.cpu(), scores.cpu()
+
+            all_masks.append(masks)
+            all_scores.append(scores)
+
+        all_masks = torch.cat(all_masks, dim=0)
+        all_scores = torch.cat(all_scores, dim=0)
+
+        return all_masks, all_scores
 
     def infer_on_multi_box_dataset(self, dataset: DetectionLabeledRasterCocoDataset):
         infer_dl = DataLoader(dataset, batch_size=1, shuffle=False,
@@ -84,13 +104,17 @@ class SamPredictorWrapper:
             post_process_processes.append(p)
 
         for tile_idx, sample in enumerate(dataset_with_progress):
+            if get_memory_usage() > 90:
+                print("Memory usage is high. Pausing for 10 seconds...")
+                time.sleep(10)
+
             image, boxes_data = sample
             image = image[:3, :, :]
             image_hwc = image.transpose((1, 2, 0))
             image_hwc = (image_hwc * 255).astype(np.uint8)
             masks, scores = self._infer(image=image_hwc, boxes=boxes_data['boxes'])
-            masks = masks.cpu().numpy()
-            scores = scores.cpu().numpy()
+            masks = masks.numpy()
+            scores = scores.numpy()
             tiles_paths.append(dataset.tiles[tile_idx]['path'])
 
             # Put masks and scores into the queue for post-processing
