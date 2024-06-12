@@ -4,14 +4,11 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from tensorboardX import SummaryWriter
-from torchvision import models
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 from tqdm import tqdm
 import albumentations as A
 
@@ -19,6 +16,7 @@ from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, Siame
     SiameseValidationDataset
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
+from engine.embedder.siamese.siamese_utils import train_collate_fn, valid_collate_fn
 
 
 def infer_model(model, dataloader, device):
@@ -117,20 +115,6 @@ def train(model, data_loader, valid_train_loader, valid_valid_loader, criterion,
 
         checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}.pth')
         torch.save(model.state_dict(), checkpoint_output_file)
-
-
-def train_collate_fn(batch):
-    imgs1 = torch.stack([torch.Tensor(b[0]) for b in batch])
-    imgs2 = torch.stack([torch.Tensor(b[1]) for b in batch])
-    labels = torch.Tensor([b[2] for b in batch])
-    margins = torch.Tensor([b[3] for b in batch])
-    return imgs1, imgs2, labels, margins
-
-
-def valid_collate_fn(batch):
-    images = torch.stack([torch.Tensor(b[0]) for b in batch])
-    labels = torch.Tensor([b[1] for b in batch])
-    return images, labels
 
 
 if __name__ == '__main__':

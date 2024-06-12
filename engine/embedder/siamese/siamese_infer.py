@@ -8,7 +8,8 @@ from geodataset.utils import COCOGenerator, decode_rle_to_polygon, CocoNameConve
 import pandas as pd
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2
-from engine.embedder.siamese.siamese_train import infer_model, valid_collate_fn
+from engine.embedder.siamese.siamese_train import infer_model
+from engine.embedder.siamese.siamese_utils import valid_collate_fn
 from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 
 
