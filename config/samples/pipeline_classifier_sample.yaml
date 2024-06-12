@@ -1,9 +1,9 @@
-pipeline_classifier:
-    io:
-        raster_path: ''
-        segmentations_geopackage_path: ''
-        output_folder: ''
+io:
+    raster_path: ''
+    segmentations_geopackage_path: ''
+    output_folder: ''
 
+pipeline_classifier:
     tilerizer:
         tile_type: 'polygon'
         tile_size: 256

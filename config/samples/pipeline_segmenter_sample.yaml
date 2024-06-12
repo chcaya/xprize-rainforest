@@ -1,9 +1,9 @@
-pipeline_segmenter:
-    io:
-        raster_path: ''
-        boxes_geopackage_path: ''
-        output_folder: ''
+io:
+    raster_path: ''
+    boxes_geopackage_path: ''
+    output_folder: ''
 
+pipeline_segmenter:
     save_segmenter_intermediate_output: false
 
     tilerizer:

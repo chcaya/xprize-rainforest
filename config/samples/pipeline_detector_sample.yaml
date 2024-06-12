@@ -1,9 +1,9 @@
-pipeline_detector:
-    io:
-        raster_path: ''
-        output_folder: ''
-        coco_n_workers: 5
+io:
+    raster_path: ''
+    output_folder: ''
+    coco_n_workers: 5
 
+pipeline_detector:
     save_detector_intermediate_output: false
 
     tilerizer:
