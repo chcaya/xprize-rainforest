@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from geodataset.dataset import SegmentationLabeledRasterCocoDataset
-from geodataset.dataset.polygon_dataset import SiameseValidationDataset
+from engine.embedder.siamese.siamese_dataset import SiameseValidationDataset
 from geodataset.utils import CocoNameConvention
 
 from config.config_parsers.embedder_parsers import EmbedderInferIOConfig, DINOv2InferConfig, SiameseInferConfig, \

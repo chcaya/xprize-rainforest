@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 import albumentations as A
 
-from geodataset.dataset.polygon_dataset import SiameseSamplerDataset, SiameseSamplerInternalDataset, \
+from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, SiameseSamplerInternalDataset, \
     SiameseValidationDataset
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
