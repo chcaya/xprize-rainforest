@@ -110,7 +110,7 @@ class SiameseInferIOConfig(SiameseInferConfig, EmbedderInferIOConfig):
     @classmethod
     def from_dict(cls, config: dict):
         embedder_infer_io_config = EmbedderInferIOConfig.from_dict(config)
-        siamese_config = DINOv2InferConfig.from_dict(config)
+        siamese_config = SiameseInferConfig.from_dict(config)
 
         return cls(
             **embedder_infer_io_config.as_dict(),

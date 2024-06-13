@@ -1,13 +1,13 @@
 embedder:
-  infer:
-    batch_size: 4
-    use_pca: false
-    pca_model_path: './output/test/embedder_test_disambiguate/pca_model_dinov2_small.pkl'   # will be loaded if it exists, or will fit a PCA model and save it if not
-    pca_n_features: 100
-    pca_n_patches: 1000000
-    io:
-      input_tiles_root: ''
-      coco_path: ''
-      output_folder: ''
-    dino_v2:
-      size: large
+    infer:
+        io:
+              input_tiles_root: 'pre_processed\final_dataset_polygons\quebec_trees\2021_09_02_sbl_z3_rgb_cog\tiles'
+              coco_path: 'pre_processed\final_dataset_polygons\quebec_trees\2021_09_02_sbl_z3_rgb_cog\2021_09_02_sbl_z3_rgb_cog_coco_gr0p05_test.json'
+              output_folder: 'embeddings\embeddings_siamese_2021_09_02_sbl_z3_rgb_cog_coco_gr0p05_test'
+        batch_size: 16
+        siamese:
+            checkpoint_path: 'models\embedder_quebec\checkpoint_0_20000.pth'
+            architecture:
+                architecture_name: 'siamese'
+                backbone_model_resnet_name: 'resnet50'
+                final_embedding_size: 1024

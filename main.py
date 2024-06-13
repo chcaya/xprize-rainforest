@@ -5,7 +5,7 @@ from config.config_parsers.aggregator_parsers import AggregatorIOConfig
 from config.config_parsers.coco_to_geopackage_parsers import CocoToGeopackageIOConfig
 from config.config_parsers.detector_parsers import DetectorScoreIOConfig, DetectorInferIOConfig, \
     DetectorTrainIOConfig
-from config.config_parsers.embedder_parsers import DINOv2InferIOConfig
+from config.config_parsers.embedder_parsers import SiameseInferIOConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferIOConfig
 from config.config_parsers.tilerizer_parsers import TilerizerIOConfig
 from config.config_parsers.pipeline_parsers import PipelineXPrizeIOConfig, PipelineSegmenterIOConfig, \
@@ -69,6 +69,6 @@ if __name__ == "__main__":
         config = CocoToGeopackageIOConfig.from_config_path(config_path)
         coco_to_geopackage_main(config)
     elif task == "embedder" and subtask == "infer":
-        config = DINOv2InferIOConfig.from_config_path(config_path)
+        config = SiameseInferIOConfig.from_config_path(config_path)
         embedder_infer_main(config)
 

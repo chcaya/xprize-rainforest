@@ -53,7 +53,7 @@ def embedder_infer_main(config: EmbedderInferIOConfig):
         siamese_dataset = SiameseValidationDataset(
             root_path=[
                 Path(config.coco_path).parent,
-                tiles_path.parent
+                tiles_path
             ],
             fold=fold
         )
