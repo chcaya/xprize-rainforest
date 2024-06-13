@@ -37,6 +37,7 @@ pipeline_detector:
                 backbone_model_resnet_name: 'resnet50'
 
     aggregator:
+        scores_weights: {'detector_score': 1.0}
         polygon_type: 'box'
         score_threshold: 0.4
         nms_threshold: 0.7

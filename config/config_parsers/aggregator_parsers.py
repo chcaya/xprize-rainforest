@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Dict
 
 from config.config_parsers.base_config_parsers import BaseConfig
 
@@ -10,6 +10,7 @@ class AggregatorConfig(BaseConfig):
     nms_threshold: float
     nms_algorithm: str
     polygon_type: str
+    scores_weights: Dict[str, float] or None
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -18,7 +19,8 @@ class AggregatorConfig(BaseConfig):
             score_threshold=aggregator_config['score_threshold'],
             nms_threshold=aggregator_config['nms_threshold'],
             nms_algorithm=aggregator_config['nms_algorithm'],
-            polygon_type=aggregator_config['polygon_type']
+            polygon_type=aggregator_config['polygon_type'],
+            scores_weights=aggregator_config['scores_weights']
         )
 
     def to_structured_dict(self):
@@ -27,7 +29,8 @@ class AggregatorConfig(BaseConfig):
                 'score_threshold': self.score_threshold,
                 'nms_threshold': self.nms_threshold,
                 'nms_algorithm': self.nms_algorithm,
-                'polygon_type': self.polygon_type
+                'polygon_type': self.polygon_type,
+                'scores_weights': self.scores_weights
             }
         }
 
@@ -39,7 +42,6 @@ class AggregatorIOConfig(AggregatorConfig):
     input_tiles_root: str
     coco_path: str or None
     output_folder: str
-    scores_names: List[str] or None
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -50,7 +52,6 @@ class AggregatorIOConfig(AggregatorConfig):
             input_tiles_root=aggregator_io_config['input_tiles_root'],
             coco_path=aggregator_io_config['coco_path'],
             output_folder=aggregator_io_config['output_folder'],
-            scores_names=aggregator_io_config['scores_names']
         )
 
     def to_structured_dict(self):
@@ -59,5 +60,4 @@ class AggregatorIOConfig(AggregatorConfig):
             'input_tiles_root': self.input_tiles_root,
             'coco_path': self.coco_path,
             'output_folder': self.output_folder,
-            'scores_names': self.scores_names
         }

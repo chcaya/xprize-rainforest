@@ -23,6 +23,7 @@ class PipelineDetector(BaseRasterPipeline):
         )
 
         self.config = pipeline_detector_config
+        self.scores_weights_config = self.config.detector_aggregator_config.scores_weights
 
         self.detector_tilerizer_output_folder = Path(self.output_folder) / 'detector_tilerizer_output'
         self.detector_output_folder = Path(self.output_folder) / 'detector_output'
@@ -66,12 +67,16 @@ class PipelineDetector(BaseRasterPipeline):
             ground_resolution=self.config.detector_tilerizer_config.raster_resolution_config.ground_resolution
         )
         detector_aggregator_output_path = self.detector_aggregator_output_folder / detector_aggregator_output_file
+
+        polygons_scores = {'detector_score': detector_polygons_scores}
+        polygons_scores_weights = {'detector_score': self.scores_weights_config['detector_score'] if self.scores_weights_config and 'detector_score' in self.scores_weights_config else 1.0}
+
         aggregator_main_with_polygons_input(
             config=self.config.detector_aggregator_config,
             tiles_paths=detector_tiles_paths,
             polygons=detector_polygons,
-            polygons_scores={'detector_score': detector_polygons_scores},
-            polygons_scores_weights={'detector_score': 1.0},
+            polygons_scores=polygons_scores,
+            polygons_scores_weights=polygons_scores_weights,
             output_path=detector_aggregator_output_path
         )
 

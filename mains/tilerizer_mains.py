@@ -50,6 +50,8 @@ def tilerizer_main(config: TilerizerIOConfig):
             output_path=Path(config.output_folder),
             labels_path=Path(config.labels_path),
             tile_size=config.tile_size,
+            use_variable_tile_size=False,
+            variable_tile_size_pixel_buffer=None,
             aois_config=aois_config,
             scale_factor=config.raster_resolution_config.scale_factor,
             ground_resolution=config.raster_resolution_config.ground_resolution,

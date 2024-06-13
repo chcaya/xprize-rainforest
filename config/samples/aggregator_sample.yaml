@@ -3,7 +3,7 @@ aggregator:
         input_tiles_root: 'Data\pre_processed\all_datasets\quebec_trees\2021_09_02_sbl_z1_rgb_cog\tiles'
         coco_path: '.\output\test\detector_infer1\2021_09_02_sbl_z1_rgb_cog_coco_sf1p0_infer.json'
         output_folder: '.\output\test\aggregator1'
-        scores_names: null
+    scores_weights: {'detector_score': 1.0}  # or {'segmenter_score': 1.0} or {'detector_score': 3.0, 'segmenter_score': 1.0}
     score_threshold: 0.4
     nms_threshold: 0.7
     nms_algorithm: 'iou'

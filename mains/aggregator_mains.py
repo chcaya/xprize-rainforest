@@ -71,7 +71,8 @@ def aggregator_main_with_coco_input(config: AggregatorIOConfig):
             score_threshold=config.score_threshold,
             nms_threshold=config.nms_threshold,
             nms_algorithm=config.nms_algorithm,
-            scores_names=config.scores_names if config.scores_names else ['detector_score']
+            scores_names=[config.scores_weights.keys()] if config.scores_weights else ['detector_score'],
+            scores_weights=[config.scores_weights.values()] if config.scores_weights else [1.0]
         )
     elif config.polygon_type == 'segmentation':
         SegmentationAggregator.from_coco(
@@ -81,7 +82,8 @@ def aggregator_main_with_coco_input(config: AggregatorIOConfig):
             score_threshold=config.score_threshold,
             nms_threshold=config.nms_threshold,
             nms_algorithm=config.nms_algorithm,
-            scores_names=config.scores_names if config.scores_names else ['segmenter_score']
+            scores_names=[config.scores_weights.keys()] if config.scores_weights else ['segmenter_score'],
+            scores_weights=[config.scores_weights.values()] if config.scores_weights else [1.0]
         )
     else:
         raise ValueError(f"Invalid polygon_type: {config.polygon_type}. Must be either 'box' or 'segmentation'.")

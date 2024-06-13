@@ -36,6 +36,7 @@ pipeline_segmenter:
 
 
     aggregator:
+        scores_weights: {'segmenter_score': 1.0} # or {'detector_score': 3.0, 'segmenter_score': 1.0}
         polygon_type: 'segmentation'
         score_threshold: 0.05
         nms_threshold: 0.5

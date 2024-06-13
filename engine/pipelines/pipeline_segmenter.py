@@ -20,6 +20,7 @@ class PipelineSegmenter(BaseRasterPipeline):
         )
 
         self.config = pipeline_segmenter_config
+        self.scores_weights_config = self.config.segmenter_aggregator_config.scores_weights
 
         self.segmenter_tilerizer_output_folder = Path(self.output_folder) / 'segmenter_tilerizer_output'
         self.segmenter_output_folder = Path(self.output_folder) / 'segmenter_output'
@@ -37,7 +38,7 @@ class PipelineSegmenter(BaseRasterPipeline):
             output_folder=self.segmenter_tilerizer_output_folder,
             labels_path=self.config.boxes_geopackage_path,
             main_label_category_column_name=None,
-            other_labels_attributes_column_names=['detector_score']
+            other_labels_attributes_column_names=['detector_score'] if self.scores_weights_config and 'detector_score' in self.scores_weights_config else None,
         )
         segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(
             config=segmenter_tilerizer_config
@@ -69,13 +70,18 @@ class PipelineSegmenter(BaseRasterPipeline):
         )
         segmenter_aggregator_output_path = self.segmenter_aggregator_output_folder / segmenter_aggregator_output_file
 
+        polygons_scores = {'segmenter_score': segmenter_masks_scores}
+        polygons_scores_weights = {'segmenter_score': self.scores_weights_config['segmenter_score'] if self.scores_weights_config and 'segmenter_score' in self.scores_weights_config else 1.0}
+        if self.scores_weights_config and 'detector_score' in self.scores_weights_config:
+            polygons_scores['detector_score'] = segmenter_boxes_scores
+            polygons_scores_weights['detector_score'] = self.scores_weights_config['detector_score'] if self.scores_weights_config and 'detector_score' in self.scores_weights_config else 1.0
+
         aggregator_main_with_polygons_input(
             config=self.config.segmenter_aggregator_config,
             tiles_paths=segmenter_tiles_paths,
             polygons=segmenter_masks,
-            polygons_scores={'detector_score': segmenter_boxes_scores,
-                             'segmenter_score': segmenter_masks_scores},
-            polygons_scores_weights={'detector_score': 3.0, 'segmenter_score': 1.0},
+            polygons_scores=polygons_scores,
+            polygons_scores_weights=polygons_scores_weights,
             output_path=segmenter_aggregator_output_path
         )
 

@@ -48,7 +48,7 @@ class TilerizerConfig(BaseConfig):
             aoi_config=aoi_config['aoi_config'],
             aoi_type=aoi_config['aoi_type'],
             aois=aoi_config['aois'],
-            ignore_black_white_alpha_tiles_threshold=tilerizer_config['ignore_black_white_alpha_tiles_threshold'],
+            ignore_black_white_alpha_tiles_threshold=tilerizer_config['ignore_black_white_alpha_tiles_threshold']
         )
 
     def to_structured_dict(self):
