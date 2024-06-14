@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import torch.nn as nn
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -17,6 +18,8 @@ from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, Siame
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
 from engine.embedder.siamese.siamese_utils import train_collate_fn, valid_collate_fn
+from engine.embedder.siamese.transforms import embedder_transforms
+from engine.constants import data_paths
 
 
 def infer_model(model, dataloader, device):
@@ -167,11 +170,7 @@ if __name__ == '__main__':
         ]
     }
 
-    transform = A.Compose([                         # TODO Daoud said he would provide a complete augmentation transform
-            A.Rotate(limit=45, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5)
-        ])
+    transform = A.Compose(embedder_transforms)
 
     siamese_sampler = SiameseSamplerDataset(dataset_config=dataset_config, transform=transform)
 

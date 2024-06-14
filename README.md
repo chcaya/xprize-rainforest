@@ -17,6 +17,11 @@ Install the required Python packages:
 pip install -r requirements.txt
 ```
 
+Create a dotenv file and the local path to your root directory
+```bash
+touch .env
+echo "LOCAL_PATH=/your/local/path" > .env
+```
 ## Configuration
 
 The pipeline is configured using YAML files. Sample configuration files are provided in the `config/samples` directory. You can copy these files and modify them according to your needs.
