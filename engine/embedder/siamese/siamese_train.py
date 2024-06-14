@@ -19,7 +19,6 @@ from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, Siame
 from engine.embedder.siamese.siamese_model import SiameseNetwork2, ContrastiveLoss
 from engine.embedder.siamese.siamese_utils import train_collate_fn, valid_collate_fn
 from engine.embedder.siamese.transforms import embedder_transforms
-from engine.constants import data_paths
 
 
 def infer_model(model, dataloader, device):
