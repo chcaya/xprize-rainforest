@@ -69,7 +69,8 @@ def train(model: SiameseNetwork2,
           writer: SummaryWriter,
           output_dir: Path,
           save_every_n_updates: int,
-          num_epochs=10):
+          num_epochs: int,
+          data_loader_num_workers: int):
 
     if use_multi_gpu and torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
@@ -84,7 +85,7 @@ def train(model: SiameseNetwork2,
         step_since_last_log = 0
         # re-instantiate the dataloader at the start of each epoch as the sampling was re-generated at the end of every epoch
         data_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True, collate_fn=train_collate_fn2,
-                                 pin_memory=use_multi_gpu, num_workers=3)
+                                 pin_memory=use_multi_gpu, num_workers=data_loader_num_workers)
         overall_step = epoch * len(data_loader) // n_grad_accumulation_steps
         accumulated_steps = 0
 
@@ -127,7 +128,8 @@ def train(model: SiameseNetwork2,
                         valid_train_dataset_for_classification=valid_train_dataset_for_classification,
                         valid_valid_dataset_for_classification=valid_valid_dataset_for_classification,
                         overall_step=overall_step,
-                        writer=writer
+                        writer=writer,
+                        data_loader_num_workers=data_loader_num_workers
                     )
 
                     checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
@@ -146,10 +148,15 @@ def train(model: SiameseNetwork2,
             valid_dataset=valid_dataset,
             epoch=epoch,
             overall_step=overall_step,
-            writer=writer
+            writer=writer,
+            data_loader_num_workers=data_loader_num_workers
         )
 
-        train_dataset = find_optimal_pairs(model, train_dataset)
+        train_dataset = find_optimal_pairs(
+            model=model,
+            dataset=train_dataset,
+            data_loader_num_workers=data_loader_num_workers
+        )
         model.train()
 
         print(f'Epoch {epoch}, Train Loss: {total_loss / len(data_loader)}, Valid Loss: {valid_loss}')
@@ -158,13 +165,19 @@ def train(model: SiameseNetwork2,
         torch.save(model.state_dict(), checkpoint_output_file)
 
 
-def find_optimal_pairs(model, dataset):
+def find_optimal_pairs(model, dataset, data_loader_num_workers):
     with torch.no_grad():
         single_item_dataset = SingleItemsSiameseSamplerDatasetWrapper(
             siamese_sampler_dataset=dataset
         )
 
-        data_loader = DataLoader(single_item_dataset, batch_size=valid_batch_size, shuffle=False, collate_fn=valid_collate_fn_string_labels, num_workers=3)
+        data_loader = DataLoader(
+            single_item_dataset,
+            batch_size=valid_batch_size,
+            shuffle=False,
+            collate_fn=valid_collate_fn_string_labels,
+            num_workers=data_loader_num_workers,
+        )
 
         _, embeddings = infer_model(model, data_loader, device, use_mixed_precision=True, desc='Inferring to find optimal pairs...')
 
@@ -179,11 +192,11 @@ def find_optimal_pairs(model, dataset):
         return dataset
 
 
-def validate_for_loss(model, valid_dataset, epoch, overall_step, writer):
+def validate_for_loss(model, valid_dataset, epoch, overall_step, writer, data_loader_num_workers):
     print(f'Validating for update {overall_step}...')
 
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=valid_batch_size, shuffle=False, num_workers=3,
-                                               collate_fn=train_collate_fn2)
+    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=valid_batch_size, shuffle=False,
+                                               num_workers=data_loader_num_workers, collate_fn=train_collate_fn2)
 
     total_loss = 0
 
@@ -208,10 +221,14 @@ def validate_for_loss(model, valid_dataset, epoch, overall_step, writer):
 def validate_for_classification(model, valid_train_dataset_for_classification, valid_valid_dataset_for_classification, overall_step, writer):
     print(f'Validating for update {overall_step}...')
 
-    valid_train_loader_for_classification = torch.utils.data.DataLoader(valid_train_dataset_for_classification, batch_size=valid_batch_size, shuffle=False, num_workers=3,
-                                                     collate_fn=valid_collate_fn2)
-    valid_valid_loader_for_classification = torch.utils.data.DataLoader(valid_valid_dataset_for_classification, batch_size=valid_batch_size, shuffle=False, num_workers=0,
-                                                     collate_fn=valid_collate_fn2)
+    valid_train_loader_for_classification = torch.utils.data.DataLoader(valid_train_dataset_for_classification,
+                                                                        batch_size=valid_batch_size, shuffle=False,
+                                                                        num_workers=data_loader_num_workers,
+                                                                        collate_fn=valid_collate_fn2)
+    valid_valid_loader_for_classification = torch.utils.data.DataLoader(valid_valid_dataset_for_classification,
+                                                                        batch_size=valid_batch_size, shuffle=False,
+                                                                        num_workers=data_loader_num_workers,
+                                                                        collate_fn=valid_collate_fn2)
 
     model.eval()
     with torch.no_grad():
@@ -281,6 +298,7 @@ if __name__ == '__main__':
     n_negative_pairs_valid = yaml_config['n_negative_pairs_valid']
     consider_percentile_train = yaml_config['consider_percentile_train']
     consider_percentile_valid = yaml_config['consider_percentile_valid']
+    data_loader_num_workers = yaml_config['data_loader_num_workers']
     phylogenetic_tree_distances_path = yaml_config['phylogenetic_tree_distances_path']
     output_folder_root = Path(yaml_config['output_folder_root'])
 
@@ -434,7 +452,8 @@ if __name__ == '__main__':
         writer=writer,
         output_dir=output_dir,
         save_every_n_updates=save_every_n_updates,
-        num_epochs=num_epochs
+        num_epochs=num_epochs,
+        data_loader_num_workers=data_loader_num_workers
     )
 
 

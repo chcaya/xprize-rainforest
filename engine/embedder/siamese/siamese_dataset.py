@@ -431,9 +431,7 @@ class SiameseSamplerDataset:
             raise ValueError("distance_compute_batch_size should be greater than the number of samples.")
 
         batch_size = distance_compute_batch_size // n
-
-        # t_digest = TDigest()
-        kll = kll_floats_sketch()
+        values_for_percentile = np.array([])
         # First loop to calculate the 80th percentile threshold
         for i in range(0, n, batch_size):
             end_index = min(i + batch_size, n)
@@ -442,28 +440,23 @@ class SiameseSamplerDataset:
             distances_flat = distances.view(-1)
 
             # Update the kll with the new batch of distances. If too many items, randomly sample 1M items
-            kll_max_update_size = 1000000
-            if len(distances_flat) > kll_max_update_size:
-                distances_flat = distances_flat[torch.randperm(distances_flat.numel())[:kll_max_update_size]]
-            for distance in distances_flat.cpu().numpy():
-                kll.update(distance)
+            keep_per_batch = 1000000
+            if len(distances_flat) > keep_per_batch:
+                distances_flat = distances_flat[torch.randperm(distances_flat.numel())[:keep_per_batch]]
+            values_for_percentile = np.concatenate((values_for_percentile, distances_flat.cpu().numpy()))
 
         total_distances = embeddings1.shape[0] * embeddings2.shape[0]
         # Get the estimated 80th percentile value
         if metric == 'closest':
             if ((self.consider_percentile / 100) * total_distances) < keep_n:
-                # threshold_value = t_digest.percentile(100 * int(keep_n / total_distances))
-                threshold_value = kll.get_quantile(int(keep_n / total_distances))
+                threshold_value = np.percentile(values_for_percentile, 100 * (keep_n / total_distances))
             else:
-                # threshold_value = t_digest.percentile(self.consider_percentile)
-                threshold_value = kll.get_quantile(self.consider_percentile / 100)
+                threshold_value = np.percentile(values_for_percentile, self.consider_percentile)
         else:
             if ((self.consider_percentile / 100) * total_distances) < keep_n:
-                # threshold_value = t_digest.percentile(100 - 100 * int(keep_n / total_distances))
-                threshold_value = kll.get_quantile(1 - int(keep_n / total_distances))
+                threshold_value = np.percentile(values_for_percentile, 100 * (1 - keep_n / total_distances))
             else:
-                # threshold_value = t_digest.percentile(100 - self.consider_percentile)
-                threshold_value = kll.get_quantile(1 - self.consider_percentile / 100)
+                threshold_value = np.percentile(values_for_percentile, 100 - self.consider_percentile)
 
         indices = []
         values_sum = 0
@@ -479,25 +472,38 @@ class SiameseSamplerDataset:
                 distances_under_threshold = distances < threshold_value
                 indices_under_threshold = torch.nonzero(distances_under_threshold, as_tuple=False)
                 # randomly select this_batch_size_ratio * keep_n closest distances
-                indices_under_threshold_random_selection = random.sample(indices_under_threshold.tolist(), int(this_batch_size_ratio * keep_n))
-                indices.extend(indices_under_threshold_random_selection)
+                k = min(len(indices_under_threshold), int(this_batch_size_ratio * keep_n), 1)
+                random_indices = torch.randperm(len(indices_under_threshold))[:k]
+                indices_under_threshold_random_selection = indices_under_threshold[random_indices].tolist()
+                indices.extend([(i + idx1, idx2) for (idx1, idx2) in indices_under_threshold_random_selection])
                 for idx in indices_under_threshold_random_selection:
                     values_sum += distances[idx[0], idx[1]]
             else:
                 distances_over_threshold = distances > threshold_value
                 indices_over_threshold = torch.nonzero(distances_over_threshold, as_tuple=False)
                 # randomly select this_batch_size_ratio * keep_n farthest distances
-                indices_under_threshold_random_selection = random.sample(indices_over_threshold.tolist(), int(this_batch_size_ratio * keep_n))
-                indices.extend(indices_under_threshold_random_selection)
-                for idx in indices_under_threshold_random_selection:
+                k = min(len(indices_over_threshold), int(this_batch_size_ratio * keep_n), 1)
+                random_indices = torch.randperm(len(indices_over_threshold))[:k]
+                indices_over_threshold_random_selection = indices_over_threshold[random_indices].tolist()
+                indices.extend([(i + idx1, idx2) for (idx1, idx2) in indices_over_threshold_random_selection])
+                for idx in indices_over_threshold_random_selection:
                     values_sum += distances[idx[0], idx[1]]
             all_distances_sum += torch.sum(distances)
 
+        # there is a bug where for large embeddings, no indices are found?
+        if len(indices) == 0:
+            indices = [(idx1.item(), idx2.item()) for (idx1, idx2) in zip(
+                torch.randint(0, embeddings1.shape[0], (keep_n,)),
+                torch.randint(0, embeddings2.shape[0], (keep_n,))
+            )]
+
+        # shuffle indices
+        random.shuffle(indices)
         indices = (indices * (keep_n // len(indices) + 1))[:keep_n] if len(indices) < keep_n else indices[:keep_n]
-        if metric == 'closest':
-            print('NEGATIVE:', values_sum / len(indices), 'DISTANCE MEAN:', all_distances_sum / total_distances, len(indices), keep_n)
-        else:
-            print('POSITIVE:', values_sum / len(indices), 'DISTANCE MEAN:', all_distances_sum / total_distances, len(indices), keep_n)
+        # if metric == 'closest':
+        #     print('NEGATIVE:', values_sum / len(indices), 'DISTANCE MEAN:', all_distances_sum / total_distances, len(indices), keep_n)
+        # else:
+        #     print('POSITIVE:', values_sum / len(indices), 'DISTANCE MEAN:', all_distances_sum / total_distances, len(indices), keep_n)
         return indices
 
     def __len__(self):

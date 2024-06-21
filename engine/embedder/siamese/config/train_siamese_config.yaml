@@ -20,6 +20,7 @@ n_positive_pairs_valid: 10000
 n_negative_pairs_valid: 10000
 consider_percentile_train: 25
 consider_percentile_valid: 75
+data_loader_num_workers: 4
 phylogenetic_tree_distances_path: /media/hugobaudchon/4 TB/XPrize/Data/phylogeny/pairs_with_dist.csv
 output_folder_root: /media/hugobaudchon/4 TB/XPrize/trainings
 
