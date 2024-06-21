@@ -1,3 +1,4 @@
+print('Script started')
 import argparse
 import os
 import time
@@ -15,6 +16,7 @@ from tensorboardX import SummaryWriter
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import albumentations as A
+print('First imports done')
 
 from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, SiameseSamplerInternalDataset, \
     SiameseValidationDataset, SingleItemsSiameseSamplerDatasetWrapper
@@ -24,6 +26,7 @@ from engine.embedder.siamese.siamese_utils import train_collate_fn2, valid_colla
     FOREST_QPEB_STD, valid_collate_fn_string_labels
 from engine.embedder.siamese.transforms import embedder_transforms
 
+print('Other imports done')
 
 def infer_model(model, dataloader, device, use_mixed_precision, desc='Infering...'):
     all_labels = []
