@@ -278,11 +278,15 @@ if __name__ == '__main__':
     print('====Siamese training main====')
     parser = argparse.ArgumentParser(description="Script to train the Siamese network for XPrize Rainforest.")
     parser.add_argument('--config_path', type=str, required=True, help='Path to the configuration file')
+    parser.add_argument('--data_root', type=str, required=False)
     args = parser.parse_args()
 
     yaml_config = yaml.safe_load(open(args.config_path, 'r'))
 
     source_data_root = Path(yaml_config['source_data_root'])
+    if args.data_root:
+        source_data_root = Path(args.data_root)
+
     use_datasets = yaml_config['use_datasets']
     resnet_model = yaml_config['resnet_model']
     use_multi_gpu = yaml_config['use_multi_gpu']
