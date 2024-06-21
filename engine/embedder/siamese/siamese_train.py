@@ -218,7 +218,12 @@ def validate_for_loss(model, valid_dataset, epoch, overall_step, writer, data_lo
         return total_loss / len(valid_loader)
 
 
-def validate_for_classification(model, valid_train_dataset_for_classification, valid_valid_dataset_for_classification, overall_step, writer):
+def validate_for_classification(model,
+                                valid_train_dataset_for_classification,
+                                valid_valid_dataset_for_classification,
+                                overall_step,
+                                writer,
+                                data_loader_num_workers):
     print(f'Validating for update {overall_step}...')
 
     valid_train_loader_for_classification = torch.utils.data.DataLoader(valid_train_dataset_for_classification,
