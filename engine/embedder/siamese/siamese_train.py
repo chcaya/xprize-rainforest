@@ -275,6 +275,7 @@ def validate_for_classification(model,
 
 
 if __name__ == '__main__':
+    print('====Siamese training main====')
     parser = argparse.ArgumentParser(description="Script to train the Siamese network for XPrize Rainforest.")
     parser.add_argument('--config_path', type=str, required=True, help='Path to the configuration file')
     args = parser.parse_args()
@@ -307,11 +308,10 @@ if __name__ == '__main__':
     phylogenetic_tree_distances_path = yaml_config['phylogenetic_tree_distances_path']
     output_folder_root = Path(yaml_config['output_folder_root'])
 
-    with open(output_folder_root / 'siamese_train_config.yaml', 'w') as config_file:
-        yaml.safe_dump(yaml_config, config_file)
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     output_model_name = f'siamese_{resnet_model}_{image_size}_{final_embedding_size}_{train_batch_size * n_grad_accumulation_steps}_mpt'
+
+    print("Config loaded.")
 
     train_dataset_brazil = SiameseSamplerInternalDataset(
         fold='train',
@@ -445,6 +445,9 @@ if __name__ == '__main__':
     output_dir = output_folder_root / f'{output_model_name}_{int(time.time())}'
     os.makedirs(output_dir, exist_ok=True)
     writer = SummaryWriter(str(output_dir))
+
+    with open(output_dir / 'siamese_train_config.yaml', 'w') as config_file:
+        yaml.safe_dump(yaml_config, config_file)
 
     train(
         model=model,
