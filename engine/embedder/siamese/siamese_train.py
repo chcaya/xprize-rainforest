@@ -302,6 +302,9 @@ if __name__ == '__main__':
     phylogenetic_tree_distances_path = yaml_config['phylogenetic_tree_distances_path']
     output_folder_root = Path(yaml_config['output_folder_root'])
 
+    with open(output_folder_root / 'siamese_train_config.yaml', 'w') as config_file:
+        yaml.safe_dump(yaml_config, config_file)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     output_model_name = f'siamese_{resnet_model}_{image_size}_{final_embedding_size}_{train_batch_size * n_grad_accumulation_steps}_mpt'
 
