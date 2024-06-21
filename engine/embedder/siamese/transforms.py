@@ -37,7 +37,7 @@ A_Torch_Wrapper = AlbumentationsTorchWrapper
 
 embedder_transforms = [
     # drop permute layers
-    A_Torch_Wrapper(RandomChannelDropout(drop_prob=0.2)),
+    A_Torch_Wrapper(RandomChannelDropout(drop_prob=0.02)),
     # A_Torch_Wrapper(RandomSpectralTransform()),
 
     # flips, standard image transforms
@@ -52,10 +52,10 @@ embedder_transforms = [
     A.GaussNoise(p=0.1),  # Equivalent to RandomNoiseInjection
     # A.Resize(256, 256, p=1.0),  # Assuming ScaleChange is a resize
     # useful for geospatial
-    A_Torch_Wrapper(Solarization(threshold=128)),
+    # A_Torch_Wrapper(Solarization(threshold=128)),
     A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.1, rotate_limit=45, p=0.2),  # For RandomRotationTranslation
     A.Affine(shear={'x': (-15, 15), 'y': (-15, 15)}, p=0.5),  # Adding shear transformation
-    A_Torch_Wrapper(PatchSwapping()),
+    # A_Torch_Wrapper(PatchSwapping()),     # causes errors
     A.CoarseDropout(max_holes=8, max_height=8, max_width=8, p=0.2),  # Similar to RandomCutoutErasing
 
     A.ToGray(p=0.02),

@@ -1,0 +1,25 @@
+source_data_root: /media/hugobaudchon/4 TB/XPrize/Data/pre_processed/FINAL_polygon_dataset_1536px_gr0p03
+use_datasets: ['quebec', 'panama', 'equator', 'brazil']
+resnet_model: resnet50
+use_multi_gpu: true
+start_from_checkpoint: null  # "/media/hugobaudchon/4 TB/XPrize/Models/siamese/checkpoint_0_30000_siamese_resnet50_768_1024_36_mpt_1718844961.485269_quebec_panama.pth"
+learning_rate: 0.0001  # 0.0001
+train_batch_size: 12
+n_grad_accumulation_steps: 3
+valid_batch_size_multiplier: 6
+image_size: 768
+dropout: 0.3
+final_embedding_size: 1024
+save_every_n_updates: 2000
+scheduler_step_every_n_updates: 2000
+scheduler_gamma: 0.9
+num_epochs: 100
+n_positive_pairs_train: 50000
+n_negative_pairs_train: 50000
+n_positive_pairs_valid: 10000
+n_negative_pairs_valid: 10000
+consider_percentile_train: 25
+consider_percentile_valid: 75
+phylogenetic_tree_distances_path: /media/hugobaudchon/4 TB/XPrize/Data/phylogeny/pairs_with_dist.csv
+output_folder_root: /media/hugobaudchon/4 TB/XPrize/trainings
+

@@ -7,8 +7,8 @@ import torch
 from geodataset.utils import COCOGenerator, decode_rle_to_polygon, CocoNameConvention
 import pandas as pd
 
-from engine.embedder.siamese.siamese_model import SiameseNetwork2
-from engine.embedder.siamese.siamese_train import infer_model
+from engine.embedder.siamese.siamese_model import SiameseNetwork
+from engine.embedder.siamese.siamese_train_old import infer_model
 from engine.embedder.siamese.siamese_utils import valid_collate_fn
 from geodataset.dataset.polygon_dataset import SiameseValidationDataset
 
@@ -27,7 +27,7 @@ def siamese_infer(siamese_dataset: SiameseValidationDataset,
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = SiameseNetwork2(resnet_model=backbone_model_resnet_name, final_embedding_size=final_embedding_size)
+    model = SiameseNetwork(resnet_model=backbone_model_resnet_name, final_embedding_size=final_embedding_size)
     print(f'Loading model from {siamese_checkpoint}')
     weights = torch.load(siamese_checkpoint)
     model.load_state_dict(weights)
