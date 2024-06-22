@@ -152,6 +152,16 @@ def train(model: SiameseNetwork2,
                         use_multi_gpu=use_multi_gpu
                     )
 
+                    validate_for_loss(
+                        model=model,
+                        valid_dataset=valid_dataset,
+                        epoch=epoch,
+                        overall_step=overall_step,
+                        writer=writer,
+                        data_loader_num_workers=data_loader_num_workers,
+                        use_multi_gpu=use_multi_gpu
+                    )
+
                     checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
                     save_model(model, checkpoint_output_file=checkpoint_output_file, use_multi_gpu=use_multi_gpu)
                     model.train()
