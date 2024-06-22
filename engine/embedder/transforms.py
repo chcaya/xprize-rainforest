@@ -3,7 +3,7 @@ import torch
 from albumentations.core.transforms_interface import ImageOnlyTransform
 import numpy as np
 
-from .torch_tranforms import (
+from engine.embedder.siamese.torch_tranforms import (
     RandomChannelDropout, RandomSpectralTransform, GeometricDistortions,
     RandomNoiseInjection, PatchSwapping, ScaleChange, Solarization,
     HorizontalFlip, RandomRotationTranslation, RandomCutoutErasing, MultiCrop

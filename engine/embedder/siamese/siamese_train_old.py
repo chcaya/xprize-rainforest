@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import torch.nn as nn
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -18,7 +17,7 @@ from engine.embedder.siamese.siamese_dataset_old import SiameseSamplerDataset, S
 
 from engine.embedder.siamese.siamese_model import SiameseNetwork, ContrastiveLoss
 from engine.embedder.siamese.siamese_utils import train_collate_fn, valid_collate_fn, FOREST_QPEB_MEAN, FOREST_QPEB_STD
-from engine.embedder.siamese.transforms import embedder_transforms
+from engine.embedder.transforms import embedder_transforms
 
 
 def infer_model(model, dataloader, device):

@@ -24,7 +24,7 @@ from engine.embedder.siamese.siamese_dataset import SiameseSamplerDataset, Siame
 from engine.embedder.siamese.siamese_model import ContrastiveLoss, SiameseNetwork2
 from engine.embedder.siamese.siamese_utils import train_collate_fn2, valid_collate_fn2, FOREST_QPEB_MEAN, \
     FOREST_QPEB_STD, valid_collate_fn_string_labels
-from engine.embedder.siamese.transforms import embedder_transforms
+from engine.embedder.transforms import embedder_transforms
 
 print('Other imports done')
 
