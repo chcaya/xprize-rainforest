@@ -28,7 +28,7 @@ from engine.embedder.siamese.transforms import embedder_transforms
 
 print('Other imports done')
 
-def infer_model(model, dataloader, device, use_mixed_precision, desc='Infering...'):
+def infer_model(model, dataloader, device, use_mixed_precision, use_multi_gpu, desc='Infering...'):
     all_labels = []
     all_embeddings = []
 
@@ -39,11 +39,18 @@ def infer_model(model, dataloader, device, use_mixed_precision, desc='Infering..
         if len(data.shape) == 3:
             data = data.unsqueeze(0)
 
-        if use_mixed_precision:
-            with torch.cuda.amp.autocast():
-                output = model.infer(data, batch_months, batch_days)
+        if use_multi_gpu:
+            if use_mixed_precision:
+                with torch.cuda.amp.autocast():
+                    output = model.module.infer(data, batch_months, batch_days)
+            else:
+                output = model.module.infer(data, batch_months, batch_days)
         else:
-            output = model.infer(data, batch_months, batch_days)
+            if use_mixed_precision:
+                with torch.cuda.amp.autocast():
+                    output = model.infer(data, batch_months, batch_days)
+            else:
+                output = model.infer(data, batch_months, batch_days)
 
         output = output.detach().cpu().numpy()
 
@@ -57,6 +64,15 @@ def infer_model(model, dataloader, device, use_mixed_precision, desc='Infering..
     final_embeddings = np.concatenate(all_embeddings, axis=0)
 
     return final_labels, final_embeddings
+
+
+def save_model(model, checkpoint_output_file, use_multi_gpu):
+    if use_multi_gpu:
+        # Save the original model which is wrapped inside `.module`
+        torch.save(model.module.state_dict(), checkpoint_output_file)
+    else:
+        # Directly save the model
+        torch.save(model.state_dict(), checkpoint_output_file)
 
 
 def train(model: SiameseNetwork2,
@@ -132,11 +148,12 @@ def train(model: SiameseNetwork2,
                         valid_valid_dataset_for_classification=valid_valid_dataset_for_classification,
                         overall_step=overall_step,
                         writer=writer,
-                        data_loader_num_workers=data_loader_num_workers
+                        data_loader_num_workers=data_loader_num_workers,
+                        use_multi_gpu=use_multi_gpu
                     )
 
                     checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
-                    torch.save(model.state_dict(), checkpoint_output_file)
+                    save_model(model, checkpoint_output_file=checkpoint_output_file, use_multi_gpu=use_multi_gpu)
                     model.train()
 
         # Check if there are remaining accumulated gradients
@@ -152,23 +169,25 @@ def train(model: SiameseNetwork2,
             epoch=epoch,
             overall_step=overall_step,
             writer=writer,
-            data_loader_num_workers=data_loader_num_workers
+            data_loader_num_workers=data_loader_num_workers,
+            use_multi_gpu=use_multi_gpu
         )
 
         train_dataset = find_optimal_pairs(
             model=model,
             dataset=train_dataset,
-            data_loader_num_workers=data_loader_num_workers
+            data_loader_num_workers=data_loader_num_workers,
+            use_multi_gpu=use_multi_gpu
         )
         model.train()
 
         print(f'Epoch {epoch}, Train Loss: {total_loss / len(data_loader)}, Valid Loss: {valid_loss}')
 
         checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}.pth')
-        torch.save(model.state_dict(), checkpoint_output_file)
+        save_model(model, checkpoint_output_file=checkpoint_output_file, use_multi_gpu=use_multi_gpu)
 
 
-def find_optimal_pairs(model, dataset, data_loader_num_workers):
+def find_optimal_pairs(model, dataset, data_loader_num_workers, use_multi_gpu):
     with torch.no_grad():
         single_item_dataset = SingleItemsSiameseSamplerDatasetWrapper(
             siamese_sampler_dataset=dataset
@@ -182,7 +201,7 @@ def find_optimal_pairs(model, dataset, data_loader_num_workers):
             num_workers=data_loader_num_workers,
         )
 
-        _, embeddings = infer_model(model, data_loader, device, use_mixed_precision=True, desc='Inferring to find optimal pairs...')
+        _, embeddings = infer_model(model, data_loader, device, use_mixed_precision=True, use_multi_gpu=use_multi_gpu, desc='Inferring to find optimal pairs...')
 
         print(embeddings.shape)
 
@@ -195,7 +214,7 @@ def find_optimal_pairs(model, dataset, data_loader_num_workers):
         return dataset
 
 
-def validate_for_loss(model, valid_dataset, epoch, overall_step, writer, data_loader_num_workers):
+def validate_for_loss(model, valid_dataset, epoch, overall_step, writer, data_loader_num_workers, use_multi_gpu):
     print(f'Validating for update {overall_step}...')
 
     valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=valid_batch_size, shuffle=False,
@@ -226,7 +245,8 @@ def validate_for_classification(model,
                                 valid_valid_dataset_for_classification,
                                 overall_step,
                                 writer,
-                                data_loader_num_workers):
+                                data_loader_num_workers,
+                                use_multi_gpu):
     print(f'Validating for update {overall_step}...')
 
     valid_train_loader_for_classification = torch.utils.data.DataLoader(valid_train_dataset_for_classification,
@@ -240,8 +260,8 @@ def validate_for_classification(model,
 
     model.eval()
     with torch.no_grad():
-        train_labels, train_embeddings = infer_model(model, valid_train_loader_for_classification, device, use_mixed_precision=False)
-        valid_labels, valid_embeddings = infer_model(model, valid_valid_loader_for_classification, device, use_mixed_precision=False)
+        train_labels, train_embeddings = infer_model(model, valid_train_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False)
+        valid_labels, valid_embeddings = infer_model(model, valid_valid_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False)
 
         train_to_delete = train_labels == -1
         valid_to_delete = valid_labels == -1
