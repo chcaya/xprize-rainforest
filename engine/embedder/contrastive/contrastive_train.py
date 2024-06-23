@@ -301,6 +301,8 @@ if __name__ == '__main__':
     n_grad_accumulation_steps = yaml_config['n_grad_accumulation_steps']
     valid_batch_size = train_batch_size * yaml_config['valid_batch_size_multiplier']
     image_size = yaml_config['image_size']
+    triplet_margin = yaml_config['triplet_margin']
+    triplet_type = yaml_config['triplet_type']
     dropout = yaml_config['dropout']
     final_embedding_size = yaml_config['final_embedding_size']
     scheduler_gamma = yaml_config['scheduler_gamma']
@@ -463,10 +465,9 @@ if __name__ == '__main__':
     distance = distances.CosineSimilarity()
     reducer = reducers.AvgNonZeroReducer()
     # criterion = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
-    margin = 0.2
-    criterion = losses.TripletMarginLoss(margin=margin, distance=distance, reducer=reducer)
+    criterion = losses.TripletMarginLoss(margin=triplet_margin, distance=distance, reducer=reducer)
     mining_func = miners.TripletMarginMiner(
-        margin=margin, distance=distance, type_of_triplets="semihard"
+        margin=triplet_margin, distance=distance, type_of_triplets=triplet_type
     )
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)

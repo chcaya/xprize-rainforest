@@ -9,6 +9,8 @@ train_batch_size: 32
 n_grad_accumulation_steps: 4
 valid_batch_size_multiplier: 1
 image_size: 768
+triplet_margin: 0.2
+triplet_type: 'semihard'
 dropout: 0.5
 final_embedding_size: 1024
 scheduler_gamma: 0.9
