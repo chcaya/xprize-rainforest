@@ -77,6 +77,7 @@ class ContrastiveDataset:
 
     def __init__(self,
                  dataset_config: dict,
+                 min_level: str,
                  image_size: int,
                  transform: albumentations.core.composition.Compose,
                  taxa_distances_df: pd.DataFrame or None,
@@ -86,6 +87,7 @@ class ContrastiveDataset:
                  min_margin: int = 0.5,
                  max_margin: int = 2):
         self.dataset_config = dataset_config
+        self.min_level = min_level
         self.image_size = image_size
         self.transform = transform
         self.taxa_distances_df = taxa_distances_df
@@ -96,6 +98,8 @@ class ContrastiveDataset:
         self.max_margin = max_margin
 
         self.datasets = dataset_config
+
+        assert self.min_level in ['species', 'genus', 'family'], f"min_level should be one of ['species', 'genus', 'family'], got {self.min_level}."
 
         if self.taxa_distances_df is not None:
             self.taxa_distances_df = taxa_distances_df.set_index(['canonicalName1', 'canonicalName2'])
@@ -186,11 +190,47 @@ class ContrastiveDataset:
                 category_id = sample['labels'][0]['category_id']
                 if category_id:
                     category_name = dataset.category_id_to_metadata_mapping[category_id]['name']
-                    if category_name in self.categories_names:
+                    if category_name == 'Dead':
                         all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                         all_samples_labels.append(category_name)
                         samples_indices_per_label[category_name].append(global_sample_id)
                         global_sample_id += 1
+                        continue
+
+                    rank = dataset.category_id_to_metadata_mapping[category_id]['rank'].lower()
+
+                    if self.min_level == 'species':
+                        if category_name in self.categories_names:
+                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_labels.append(category_name)
+                            samples_indices_per_label[category_name].append(global_sample_id)
+                            global_sample_id += 1
+
+                    elif self.min_level == 'genus':
+                        if rank == 'species':
+                            genus_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
+                        else:
+                            genus_name = category_name
+
+                        if genus_name in self.categories_names:
+                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_labels.append(genus_name)
+                            samples_indices_per_label[genus_name].append(global_sample_id)
+                            global_sample_id += 1
+
+                    elif self.min_level == 'family':
+                        if rank == 'species':
+                            family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['supercategory']]['name']
+                        elif rank == 'genus':
+                            family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
+                        else:
+                            family_name = category_name
+
+                        if family_name in self.categories_names:
+                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_labels.append(family_name)
+                            samples_indices_per_label[family_name].append(global_sample_id)
+                            global_sample_id += 1
 
         return all_samples_labels, all_samples_indices, samples_indices_per_label
 

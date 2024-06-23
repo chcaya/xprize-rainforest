@@ -292,6 +292,7 @@ if __name__ == '__main__':
         source_data_root = Path(args.data_root)
 
     use_datasets = yaml_config['use_datasets']
+    min_level = yaml_config['min_level']
     quebec_classification_dates = yaml_config['quebec_classification_dates']
     resnet_model = yaml_config['resnet_model']
     use_multi_gpu = yaml_config['use_multi_gpu']
@@ -391,6 +392,7 @@ if __name__ == '__main__':
 
     siamese_sampler_dataset_train = ContrastiveDataset(
         dataset_config=train_dataset_config,
+        min_level=min_level,
         image_size=image_size,
         transform=A.Compose(embedder_transforms),
         normalize=True,
@@ -401,6 +403,7 @@ if __name__ == '__main__':
 
     siamese_sampler_dataset_valid = ContrastiveDataset(
         dataset_config=valid_dataset_config,
+        min_level=min_level,
         image_size=image_size,
         transform=None,
         normalize=True,
@@ -433,6 +436,7 @@ if __name__ == '__main__':
 
     valid_train_dataset_quebec_for_classification = ContrastiveDataset(
         dataset_config={'quebec': valid_train_dataset_quebec},
+        min_level=min_level,
         image_size=image_size,
         transform=A.Compose(embedder_transforms),
         normalize=True,
@@ -443,6 +447,7 @@ if __name__ == '__main__':
 
     valid_valid_dataset_quebec_for_classification = ContrastiveDataset(
         dataset_config={'quebec': valid_valid_dataset_quebec},
+        min_level=min_level,
         image_size=image_size,
         transform=None,
         normalize=True,
