@@ -9,9 +9,11 @@ import torch
 
 import yaml
 from pytorch_metric_learning import losses, distances, reducers, miners
+from pytorch_metric_learning.distances import LpDistance
 from pytorch_metric_learning.samplers import MPerClassSampler, FixedSetOfTriplets
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from tensorboardX import SummaryWriter
@@ -20,7 +22,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
-from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, save_model, \
     contrastive_collate_fn
 from engine.embedder.transforms import embedder_transforms
@@ -29,38 +31,62 @@ from engine.embedder.transforms import embedder_transforms
 def infer_model(model, dataloader, device, use_mixed_precision, use_multi_gpu, desc='Infering...', as_numpy=True):
     all_labels = []
     all_labels_ids = []
+    all_families = []
+    all_families_ids = []
     all_embeddings = []
+    all_predicted_families = []
 
-    for batch_images, batch_months, batch_days, batch_labels_ids, batch_labels in tqdm(dataloader, total=len(dataloader), desc=desc):
-        data = torch.Tensor(batch_images).to(device)
-        batch_months = torch.Tensor(batch_months).to(device)
-        batch_days = torch.Tensor(batch_days).to(device)
+    for images, months, days, labels_ids, labels, families_ids, families in tqdm(dataloader, total=len(dataloader), desc=desc):
+        data = torch.Tensor(images).to(device)
+        months = torch.Tensor(months).to(device)
+        days = torch.Tensor(days).to(device)
         if len(data.shape) == 3:
             data = data.unsqueeze(0)
 
         if use_mixed_precision:
             with torch.cuda.amp.autocast():
-                output = model(data, batch_months, batch_days)
+                output = model(data, months, days)
         else:
-            output = model(data, batch_months, batch_days)
+            output = model(data, months, days)
 
-        all_labels.append(batch_labels)
-        all_labels_ids.append(batch_labels_ids.cpu())
-        all_embeddings.append(output.detach().cpu())
+        if isinstance(model, nn.DataParallel):
+            actual_model = model.module
+        else:
+            actual_model = model
+
+        if isinstance(actual_model, XPrizeTreeEmbedder):
+            embeddings = output
+            predicted_families = [None] * len(labels)
+        elif isinstance(actual_model, XPrizeTreeEmbedder2):
+            embeddings, classifier_logits = output[0], output[1]
+            predicted_families_ids = torch.argmax(classifier_logits, dim=1)
+            predicted_families = [model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
+        else:
+            raise ValueError(f'Unknown model type: {actual_model.__class__}')
+
+        all_labels.append(labels)
+        all_labels_ids.append(labels_ids.cpu())
+        all_families.append(families)
+        all_families_ids.append(families_ids.cpu())
+        all_embeddings.append(embeddings.detach().cpu())
+        all_predicted_families.append(predicted_families)
 
     final_labels = sum(all_labels, [])
     final_labels_ids = torch.cat(all_labels_ids, dim=0)
+    final_families = sum(all_families, [])
+    final_families_ids = torch.cat(all_families_ids, dim=0)
     final_embeddings = torch.cat(all_embeddings, dim=0)
+    final_predicted_families = sum(all_predicted_families, [])
 
     if as_numpy:
         final_labels = np.array(final_labels)
         final_embeddings = final_embeddings.numpy()
         final_labels_ids = final_labels_ids.numpy()
 
-    return final_labels, final_labels_ids, final_embeddings
+    return final_labels, final_labels_ids, final_families, final_families_ids, final_embeddings, final_predicted_families
 
 
-def train(model: XPrizeTreeEmbedder,
+def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
           train_dataset: ContrastiveDataset,
           valid_dataset: ContrastiveDataset,
           valid_train_dataset_for_classification: ContrastiveDataset,
@@ -68,10 +94,12 @@ def train(model: XPrizeTreeEmbedder,
           train_batch_size: int,
           valid_batch_size: int,
           use_multi_gpu: bool,
+          distance: str,
           mining_func: miners.BaseMiner,
-          criterion: losses.BaseMetricLossFunction,
+          criterion_metric: losses.BaseMetricLossFunction,
+          criterion_classification: nn.Module,
           optimizer: torch.optim.Optimizer,
-          scheduler: torch.optim.lr_scheduler.StepLR,
+          scheduler: torch.optim.lr_scheduler._LRScheduler,
           n_grad_accumulation_steps: int,
           writer: SummaryWriter,
           output_dir: Path,
@@ -102,16 +130,32 @@ def train(model: XPrizeTreeEmbedder,
         accumulated_steps = 0
 
         for data in tqdm(data_loader, desc=f'Epoch {epoch}...'):
-            imgs, months, days, labels_ids, labels = data
-            imgs, labels_ids = imgs.to(device), labels_ids.to(device)
+            imgs, months, days, labels_ids, labels, families_ids, families = data
+            imgs, labels_ids, families_ids = imgs.to(device), labels_ids.to(device), families_ids.to(device)
             months, days = months.to(device), days.to(device),
 
             optimizer.zero_grad()
 
             with torch.cuda.amp.autocast():  # Enable autocasting for mixed precision
-                embeddings = model(imgs, months, days)
-                indices_tuple = mining_func(embeddings, labels_ids)
-                loss = criterion(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
+                if isinstance(model, nn.DataParallel):
+                    actual_model = model.module
+                else:
+                    actual_model = model
+
+                if isinstance(actual_model, XPrizeTreeEmbedder):
+                    embeddings = model(imgs, months, days)
+                    indices_tuple = mining_func(embeddings, labels_ids)
+                    loss = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
+                elif isinstance(actual_model, XPrizeTreeEmbedder2):
+                    embeddings, classifier_logits = model(imgs, months, days)
+                    indices_tuple = mining_func(embeddings, labels_ids)
+                    loss_triplet = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
+                    model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
+                    loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
+                    loss = 2 * loss_triplet + 0.2 * loss_classification
+                    print(loss_triplet, 2 * loss_triplet, loss_classification, 0.2 * loss_classification, loss)
+                else:
+                    raise ValueError(f'Unknown model type: {actual_model.__class__}')
 
             scaler.scale(loss).backward()  # Backward pass with scaled loss
 
@@ -148,6 +192,7 @@ def train(model: XPrizeTreeEmbedder,
             valid_train_dataset_for_classification=valid_train_dataset_for_classification,
             valid_valid_dataset_for_classification=valid_valid_dataset_for_classification,
             valid_batch_size=valid_batch_size,
+            distance=distance,
             epoch=epoch,
             overall_step=overall_step,
             writer=writer,
@@ -159,6 +204,7 @@ def train(model: XPrizeTreeEmbedder,
             model=model,
             valid_dataset=valid_dataset,
             valid_batch_size=valid_batch_size,
+            criterion_metric=criterion_metric,
             epoch=epoch,
             overall_step=overall_step,
             writer=writer,
@@ -178,6 +224,7 @@ def validate_for_classification(model,
                                 valid_train_dataset_for_classification,
                                 valid_valid_dataset_for_classification,
                                 valid_batch_size,
+                                distance,
                                 overall_step,
                                 epoch,
                                 writer,
@@ -196,8 +243,8 @@ def validate_for_classification(model,
 
     model.eval()
     with torch.no_grad():
-        train_labels, train_labels_ids, train_embeddings = infer_model(model, valid_train_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False)
-        valid_labels, valid_labels_ids, valid_embeddings = infer_model(model, valid_valid_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False)
+        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model(model, valid_train_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, desc='Inferring train samples...')
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model(model, valid_valid_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, desc='Inferring valid samples...')
 
         train_to_delete = train_labels == -1
         valid_to_delete = valid_labels == -1
@@ -213,29 +260,43 @@ def validate_for_classification(model,
         X_test = scaler_standard.transform(valid_embeddings)
 
         # Train the SVC
-        svc = SVC(kernel='linear')
-        svc.fit(X_train, train_labels)
+        k_neighbors = KNeighborsClassifier(n_neighbors=5, metric=distance)
+        k_neighbors.fit(X_train, train_labels)
+        predictions = k_neighbors.predict(X_test)
 
-        # Evaluate the SVC
-        y_pred = svc.predict(X_test)
+        accuracy = accuracy_score(valid_labels, predictions)
+        metrics = precision_recall_fscore_support(valid_labels, predictions, average='macro')
+        metrics_weighted = precision_recall_fscore_support(valid_labels, predictions, average='weighted')
+        writer.add_scalar('Valid/KNN/Accuracy', accuracy, overall_step)
+        writer.add_scalar('Valid/KNN/Macro_Precision', metrics[0], overall_step)
+        writer.add_scalar('Valid/KNN/Macro_Recall', metrics[1], overall_step)
+        writer.add_scalar('Valid/KNN/Macro_F1', metrics[2], overall_step)
+        writer.add_scalar('Valid/KNN/Weighted_Precision', metrics_weighted[0], overall_step)
+        writer.add_scalar('Valid/KNN/Weighted_Recall', metrics_weighted[1], overall_step)
+        writer.add_scalar('Valid/KNN/Weighted_F1', metrics_weighted[2], overall_step)
+        print(f'Validation Accuracy: KNN: {accuracy}')
 
-        accuracy = accuracy_score(valid_labels, y_pred)
-        metrics = precision_recall_fscore_support(valid_labels, y_pred, average='macro')
-        metrics_weighted = precision_recall_fscore_support(valid_labels, y_pred,
-                                                           average='weighted')
-        writer.add_scalar('Valid/Accuracy', accuracy, overall_step)
-        writer.add_scalar('Valid/Macro_Precision', metrics[0], overall_step)
-        writer.add_scalar('Valid/Macro_Recall', metrics[1], overall_step)
-        writer.add_scalar('Valid/Macro_F1', metrics[2], overall_step)
-        writer.add_scalar('Valid/Weighted_Precision', metrics_weighted[0], overall_step)
-        writer.add_scalar('Valid/Weighted_Recall', metrics_weighted[1], overall_step)
-        writer.add_scalar('Valid/Weighted_F1', metrics_weighted[2], overall_step)
-        print(f'Validation Accuracy: {accuracy}')
+        if isinstance(model, nn.DataParallel):
+            actual_model = model.module
+        else:
+            actual_model = model
+
+        if isinstance(actual_model, XPrizeTreeEmbedder2):
+            accuracy_train = accuracy_score(train_families, train_predicted_families)
+            accuracy_valid = accuracy_score(valid_families, valid_predicted_families)
+            f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
+            f1_weighted = precision_recall_fscore_support(valid_families, valid_predicted_families, average='weighted')[2]
+            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
+            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', f1_macro, overall_step)
+            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Weighted_F1', f1_weighted, overall_step)
+            print(f'Validation Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_valid}')
+            print(f'Train Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_train}')
 
 
 def validate_for_loss(model,
                       valid_dataset,
                       valid_batch_size,
+                      criterion_metric,
                       epoch,
                       overall_step,
                       writer,
@@ -258,20 +319,8 @@ def validate_for_loss(model,
 
     model.eval()
     with torch.no_grad():
-        valid_labels, valid_labels_ids, valid_embeddings = infer_model(model, valid_loader, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, as_numpy=False)
-        total_loss = criterion(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
-
-        #
-        # for data in tqdm(valid_loader, desc=f'Valid for epoch {epoch}...'):
-        #     imgs, months, days, labels_ids, labels = data
-        #     imgs, labels_ids = imgs.to(device), labels_ids.to(device)
-        #     months, days = months.to(device), days.to(device),
-        #
-        #     with torch.cuda.amp.autocast():  # Enable autocasting for mixed precision
-        #         embeddings = model(imgs, months, days)
-        #         loss = criterion(embeddings=embeddings, labels=labels_ids)
-        #
-        #     total_loss += loss.item()
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model(model, valid_loader, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, as_numpy=False)
+        total_loss = criterion_metric(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
 
         writer.add_scalar('Valid/Loss', total_loss / len(valid_loader), overall_step)
 
@@ -293,6 +342,7 @@ if __name__ == '__main__':
 
     use_datasets = yaml_config['use_datasets']
     min_level = yaml_config['min_level']
+    distance = yaml_config['distance']
     quebec_classification_dates = yaml_config['quebec_classification_dates']
     resnet_model = yaml_config['resnet_model']
     use_multi_gpu = yaml_config['use_multi_gpu']
@@ -306,14 +356,14 @@ if __name__ == '__main__':
     triplet_type = yaml_config['triplet_type']
     dropout = yaml_config['dropout']
     final_embedding_size = yaml_config['final_embedding_size']
-    scheduler_gamma = yaml_config['scheduler_gamma']
+    scheduler_T = yaml_config['scheduler_T']
     num_epochs = yaml_config['num_epochs']
     data_loader_num_workers = yaml_config['data_loader_num_workers']
     phylogenetic_tree_distances_path = yaml_config['phylogenetic_tree_distances_path']
     output_folder_root = Path(yaml_config['output_folder_root'])
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    output_model_name = f'contrastive_{resnet_model}_{image_size}_{final_embedding_size}_{train_batch_size * n_grad_accumulation_steps}_mpt'
+    output_model_name = f'contrastive_{resnet_model}_{image_size}_{final_embedding_size}_{train_batch_size * n_grad_accumulation_steps}_{min_level}'
 
     # Loading datasets
     print('Loading datasets...')
@@ -458,25 +508,39 @@ if __name__ == '__main__':
 
     print('Datasets loaded successfully.')
 
-    model = XPrizeTreeEmbedder(
+    model = XPrizeTreeEmbedder2(
         resnet_model=resnet_model,
         final_embedding_size=final_embedding_size,
-        dropout=dropout
+        dropout=dropout,
+        date_embedding_dim=32,
+        families=list(siamese_sampler_dataset_train.families_set),
     ).to(device)
 
     if start_from_checkpoint:
-        model.load_state_dict(torch.load(start_from_checkpoint))
+        if isinstance(model, XPrizeTreeEmbedder):
+            model.load_state_dict(torch.load(start_from_checkpoint))
+        elif isinstance(model, XPrizeTreeEmbedder2):
+            model = model.from_checkpoint(start_from_checkpoint)
+        else:
+            raise ValueError(f'Unknown model type: {model.__class__}')
 
-    distance = distances.CosineSimilarity()
+    if distance == 'cosine':
+        distance_f = distances.CosineSimilarity()
+    elif distance == 'euclidean':
+        distance_f = LpDistance(normalize_embeddings=True, p=2, power=1)
+    else:
+        raise ValueError(f'Unknown distance metric: {distance}')
+
     reducer = reducers.AvgNonZeroReducer()
     # criterion = losses.ContrastiveLoss(pos_margin=0, neg_margin=1)
-    criterion = losses.TripletMarginLoss(margin=triplet_margin, distance=distance, reducer=reducer)
+    criterion_metric = losses.TripletMarginLoss(margin=triplet_margin, distance=distance_f, reducer=reducer)
+    criterion_classification = nn.CrossEntropyLoss()
     mining_func = miners.TripletMarginMiner(
-        margin=triplet_margin, distance=distance, type_of_triplets=triplet_type
+        margin=triplet_margin, distance=distance_f, type_of_triplets=triplet_type
     )
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=scheduler_gamma)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_T)
 
     output_dir = output_folder_root / f'{output_model_name}_{int(time.time())}'
     os.makedirs(output_dir, exist_ok=True)
@@ -494,8 +558,10 @@ if __name__ == '__main__':
         train_batch_size=train_batch_size,
         valid_batch_size=valid_batch_size,
         use_multi_gpu=use_multi_gpu,
+        distance=distance,
         mining_func=mining_func,
-        criterion=criterion,
+        criterion_metric=criterion_metric,
+        criterion_classification=criterion_classification,
         optimizer=optimizer,
         scheduler=scheduler,
         n_grad_accumulation_steps=n_grad_accumulation_steps,

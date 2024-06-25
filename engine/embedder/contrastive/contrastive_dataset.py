@@ -113,7 +113,8 @@ class ContrastiveDataset:
             )
 
         self.categories_names, self.categories_names_to_idx, self.categories_dists = self._get_categories_distances()
-        self.all_samples_labels, self.all_samples_indices, self.samples_indices_per_label = self._get_all_samples()
+        self.all_samples_labels, self.all_samples_families, self.all_samples_indices, self.samples_indices_per_label = self._get_all_samples()
+        self.families_set = set(self.all_samples_families)
         self._remove_not_represented_categories()
 
         sorted_dict = {k: len(v) for k, v in sorted(self.samples_indices_per_label.items(), key=lambda item: len(item[1]), reverse=True)}
@@ -182,6 +183,7 @@ class ContrastiveDataset:
     def _get_all_samples(self):
         all_samples_indices = {}
         all_samples_labels = []
+        all_samples_families = []
         samples_indices_per_label = {k: [] for k in self.categories_names}
         global_sample_id = 0
         for dataset_key in self.datasets:
@@ -193,46 +195,50 @@ class ContrastiveDataset:
                     if category_name == 'Dead':
                         all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                         all_samples_labels.append(category_name)
+                        all_samples_families.append(category_name)
                         samples_indices_per_label[category_name].append(global_sample_id)
                         global_sample_id += 1
                         continue
 
                     rank = dataset.category_id_to_metadata_mapping[category_id]['rank'].lower()
 
+                    if rank == 'species':
+                        genus_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
+                        family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['supercategory']]['name']
+                    elif rank == 'genus':
+                        genus_name = category_name
+                        family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
+                    elif rank == 'family':
+                        genus_name = None
+                        family_name = category_name
+                    else:
+                        raise ValueError(f"Unknown category rank: {rank}.")
+
                     if self.min_level == 'species':
                         if category_name in self.categories_names:
                             all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(category_name)
+                            all_samples_families.append(family_name)
                             samples_indices_per_label[category_name].append(global_sample_id)
                             global_sample_id += 1
 
                     elif self.min_level == 'genus':
-                        if rank == 'species':
-                            genus_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
-                        else:
-                            genus_name = category_name
-
                         if genus_name in self.categories_names:
                             all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(genus_name)
+                            all_samples_families.append(family_name)
                             samples_indices_per_label[genus_name].append(global_sample_id)
                             global_sample_id += 1
 
                     elif self.min_level == 'family':
-                        if rank == 'species':
-                            family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['supercategory']]['name']
-                        elif rank == 'genus':
-                            family_name = dataset.category_id_to_metadata_mapping[dataset.category_id_to_metadata_mapping[category_id]['supercategory']]['name']
-                        else:
-                            family_name = category_name
-
                         if family_name in self.categories_names:
                             all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(family_name)
+                            all_samples_families.append(family_name)
                             samples_indices_per_label[family_name].append(global_sample_id)
                             global_sample_id += 1
 
-        return all_samples_labels, all_samples_indices, samples_indices_per_label
+        return all_samples_labels, all_samples_families, all_samples_indices, samples_indices_per_label
 
     def _remove_not_represented_categories(self):
         self.categories_names = set([k for k in self.categories_names if len(self.samples_indices_per_label[k]) != 0])
@@ -246,6 +252,8 @@ class ContrastiveDataset:
         dataset_key, dataset_idx = self.all_samples_indices[real_idx]
         label = self.all_samples_labels[real_idx]
         label_id = self.categories_names_to_idx[label]
+        family = self.all_samples_families[real_idx]
+        family_id = self.categories_names_to_idx[family]
         tile = self.datasets[dataset_key][dataset_idx]
         month, day = tile['month'], tile['day']
 
@@ -271,4 +279,4 @@ class ContrastiveDataset:
         if self.normalize:
             data = normalize(data, self.mean, self.std)
 
-        return data, month, day, label_id, label
+        return data, month, day, label_id, label, family_id, family

@@ -5,6 +5,8 @@ import heapq
 
 from torch import nn
 
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
+
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
 IMAGENET_STD = np.array([0.229, 0.224, 0.225])
 
@@ -31,10 +33,17 @@ def normalize(data: np.array, mean: np.array, std: np.array):
 def save_model(model, checkpoint_output_file):
     if isinstance(model, nn.DataParallel):
         # Save the original model which is wrapped inside `.module`
-        torch.save(model.module.state_dict(), checkpoint_output_file)
+        actual_model = model.module
     else:
         # Directly save the model
-        torch.save(model.state_dict(), checkpoint_output_file)
+        actual_model = model
+
+    if isinstance(actual_model, XPrizeTreeEmbedder):
+        torch.save(actual_model.state_dict(), checkpoint_output_file)
+    elif isinstance(actual_model, XPrizeTreeEmbedder2):
+        actual_model.save(checkpoint_output_file)
+    else:
+        raise NotImplementedError(f"Model type not supported for saving: {type(actual_model)}.")
 
 
 def pad_and_stack_images(images):
@@ -62,12 +71,14 @@ def pad_and_stack_images(images):
 
 def contrastive_collate_fn(batch):
     images = [torch.Tensor(b[0]) for b in batch]
-    months = torch.Tensor([b[1] for b in batch])
-    days = torch.Tensor([b[2] for b in batch])
+    months = torch.Tensor([b[1] for b in batch]).long()
+    days = torch.Tensor([b[2] for b in batch]).long()
     labels_ids = torch.Tensor([b[3] for b in batch])
     labels = [b[4] for b in batch]
+    families_ids = torch.Tensor([b[5] for b in batch])
+    families = [b[6] for b in batch]
 
     images_padded = pad_and_stack_images(images)
 
-    return images_padded, months, days, labels_ids, labels
+    return images_padded, months, days, labels_ids, labels, families_ids, families
 
