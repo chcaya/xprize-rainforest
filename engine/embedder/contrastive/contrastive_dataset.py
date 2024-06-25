@@ -280,3 +280,49 @@ class ContrastiveDataset:
             data = normalize(data, self.mean, self.std)
 
         return data, month, day, label_id, label, family_id, family
+
+
+class ContrastiveInferDataset(BaseContrastiveLabeledCocoDataset):
+    def __init__(self, image_size: int, transform: albumentations.core.composition.Compose,
+                 fold: str, root_path: Path or List[Path], date_pattern: str, normalize: bool = True,
+                 mean: np.array = FOREST_QPEB_MEAN, std: np.array = FOREST_QPEB_STD):
+
+        super().__init__(fold=fold, root_path=root_path, date_pattern=date_pattern, transform=transform)
+        self.image_size = image_size
+        self.transform = transform
+        self.normalize = normalize
+        self.mean = mean
+        self.std = std
+
+    def __len__(self):
+        return len(self.tiles)
+
+    def __getitem__(self, idx):
+        tile = self.tiles[idx]
+        month, day = tile['month'], tile['day']
+
+        with rasterio.open(tile['path']) as tile_file:
+            data = tile_file.read([1, 2, 3])
+
+        if data.shape[1] > self.image_size:
+            # crop
+            data_center = int(data.shape[1] / 2)
+            data = data[:,
+                        data_center - self.image_size // 2:data_center + self.image_size // 2,
+                        data_center - self.image_size // 2:data_center + self.image_size // 2,
+                        ]
+        elif data.shape[1] < self.image_size:
+            # pad
+            padding = (self.image_size - data.shape[1]) // 2
+            padded_data = np.zeros((data.shape[0], self.image_size, self.image_size), dtype=data.dtype)
+            padded_data[:, padding:padding + data.shape[1], padding:padding + data.shape[1]] = data
+            data = padded_data
+
+        data = data / 255
+
+        if self.normalize:
+            data = normalize(data, self.mean, self.std)
+
+        return data, month, day
+
+

@@ -82,3 +82,13 @@ def contrastive_collate_fn(batch):
 
     return images_padded, months, days, labels_ids, labels, families_ids, families
 
+
+def contrastive_infer_collate_fn(batch):
+    images = [torch.Tensor(b[0]) for b in batch]
+    months = torch.Tensor([b[1] for b in batch]).long()
+    days = torch.Tensor([b[2] for b in batch]).long()
+
+    images_padded = pad_and_stack_images(images)
+
+    return images_padded, months, days
+

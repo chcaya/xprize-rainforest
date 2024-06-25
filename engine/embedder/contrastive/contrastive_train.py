@@ -29,7 +29,27 @@ from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FORE
 from engine.embedder.transforms import embedder_transforms
 
 
-def infer_model(model, dataloader, device, use_mixed_precision, use_multi_gpu, desc='Infering...', as_numpy=True):
+def infer_model_without_labels(model, dataloader, device, use_mixed_precision, desc='Infering...', as_numpy=True):
+    all_embeddings = []
+    all_predicted_families = []
+
+    for images, months, days in tqdm(dataloader, total=len(dataloader), desc=desc):
+        embeddings, predicted_families = infer_batch(images=images, months=months, days=days, model=model,
+                                                     device=device, use_mixed_precision=use_mixed_precision)
+
+        all_embeddings.append(embeddings.detach().cpu())
+        all_predicted_families.append(predicted_families)
+
+    final_embeddings = torch.cat(all_embeddings, dim=0)
+    final_predicted_families = sum(all_predicted_families, [])
+
+    if as_numpy:
+        final_embeddings = final_embeddings.numpy()
+
+    return final_embeddings, final_predicted_families
+
+
+def infer_model_with_labels(model, dataloader, device, use_mixed_precision, desc='Infering...', as_numpy=True):
     all_labels = []
     all_labels_ids = []
     all_families = []
@@ -38,32 +58,8 @@ def infer_model(model, dataloader, device, use_mixed_precision, use_multi_gpu, d
     all_predicted_families = []
 
     for images, months, days, labels_ids, labels, families_ids, families in tqdm(dataloader, total=len(dataloader), desc=desc):
-        data = torch.Tensor(images).to(device)
-        months = torch.Tensor(months).to(device)
-        days = torch.Tensor(days).to(device)
-        if len(data.shape) == 3:
-            data = data.unsqueeze(0)
-
-        if use_mixed_precision:
-            with torch.cuda.amp.autocast():
-                output = model(data, months, days)
-        else:
-            output = model(data, months, days)
-
-        if isinstance(model, nn.DataParallel):
-            actual_model = model.module
-        else:
-            actual_model = model
-
-        if isinstance(actual_model, XPrizeTreeEmbedder):
-            embeddings = output
-            predicted_families = [None] * len(labels)
-        elif isinstance(actual_model, XPrizeTreeEmbedder2):
-            embeddings, classifier_logits = output[0], output[1]
-            predicted_families_ids = torch.argmax(classifier_logits, dim=1)
-            predicted_families = [model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
-        else:
-            raise ValueError(f'Unknown model type: {actual_model.__class__}')
+        embeddings, predicted_families = infer_batch(images=images, months=months, days=days, model=model,
+                                                     device=device, use_mixed_precision=use_mixed_precision)
 
         all_labels.append(labels)
         all_labels_ids.append(labels_ids.cpu())
@@ -85,6 +81,37 @@ def infer_model(model, dataloader, device, use_mixed_precision, use_multi_gpu, d
         final_labels_ids = final_labels_ids.numpy()
 
     return final_labels, final_labels_ids, final_families, final_families_ids, final_embeddings, final_predicted_families
+
+
+def infer_batch(images, months, days, model, device, use_mixed_precision):
+    data = torch.Tensor(images).to(device)
+    months = torch.Tensor(months).to(device)
+    days = torch.Tensor(days).to(device)
+    if len(data.shape) == 3:
+        data = data.unsqueeze(0)
+
+    if use_mixed_precision:
+        with torch.cuda.amp.autocast():
+            output = model(data, months, days)
+    else:
+        output = model(data, months, days)
+
+    if isinstance(model, nn.DataParallel):
+        actual_model = model.module
+    else:
+        actual_model = model
+
+    if isinstance(actual_model, XPrizeTreeEmbedder):
+        embeddings = output
+        predicted_families = [None] * len(images)
+    elif isinstance(actual_model, XPrizeTreeEmbedder2):
+        embeddings, classifier_logits = output[0], output[1]
+        predicted_families_ids = torch.argmax(classifier_logits, dim=1)
+        predicted_families = [model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
+    else:
+        raise ValueError(f'Unknown model type: {actual_model.__class__}')
+
+    return embeddings, predicted_families
 
 
 def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
@@ -255,8 +282,8 @@ def validate_for_classification(model,
 
     model.eval()
     with torch.no_grad():
-        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model(model, valid_train_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, desc='Inferring train samples...')
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model(model, valid_valid_loader_for_classification, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, desc='Inferring valid samples...')
+        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model_with_labels(model, valid_train_loader_for_classification, device, use_mixed_precision=False, desc='Inferring train samples...')
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_valid_loader_for_classification, device, use_mixed_precision=False, desc='Inferring valid samples...')
 
         train_to_delete = train_labels == -1
         valid_to_delete = valid_labels == -1
@@ -298,6 +325,7 @@ def validate_for_classification(model,
             accuracy_valid = accuracy_score(valid_families, valid_predicted_families)
             f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
             f1_weighted = precision_recall_fscore_support(valid_families, valid_predicted_families, average='weighted')[2]
+            writer.add_scalar('Train/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
             writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
             writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', f1_macro, overall_step)
             writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Weighted_F1', f1_weighted, overall_step)
@@ -331,10 +359,10 @@ def validate_for_loss(model,
 
     model.eval()
     with torch.no_grad():
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model(model, valid_loader, device, use_multi_gpu=use_multi_gpu, use_mixed_precision=False, as_numpy=False)
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_loader, device, use_mixed_precision=False, as_numpy=False)
         total_loss = criterion_metric(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
 
-        writer.add_scalar('Valid/Loss', total_loss / len(valid_loader), overall_step)
+        writer.add_scalar('Valid/Loss_Triplet', total_loss / len(valid_loader), overall_step)
 
         return total_loss / len(valid_loader)
 
@@ -371,6 +399,7 @@ if __name__ == '__main__':
     dropout = yaml_config['dropout']
     final_embedding_size = yaml_config['final_embedding_size']
     scheduler_T = yaml_config['scheduler_T']
+    n_warmup_epochs = yaml_config['n_warmup_epochs']
     num_epochs = yaml_config['num_epochs']
     data_loader_num_workers = yaml_config['data_loader_num_workers']
     phylogenetic_tree_distances_path = yaml_config['phylogenetic_tree_distances_path']
