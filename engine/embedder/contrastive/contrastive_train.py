@@ -93,6 +93,8 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
           valid_valid_dataset_for_classification: ContrastiveDataset,
           train_batch_size: int,
           valid_batch_size: int,
+          loss_weight_triplet: float,
+          loss_weight_classification: float,
           use_multi_gpu: bool,
           distance: str,
           mining_func: miners.BaseMiner,
@@ -124,6 +126,8 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
         model.train()
         total_loss = 0
         loss_since_last_log = 0
+        loss_classification_since_last_log = 0
+        loss_triplet_since_last_log = 0
         step_since_last_log = 0
         # re-instantiate the dataloader at the start of each epoch as the sampling was re-generated at the end of every epoch
         overall_step = epoch * len(data_loader) // n_grad_accumulation_steps
@@ -152,8 +156,10 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
                     loss_triplet = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
                     model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
                     loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
-                    loss = 2 * loss_triplet + 0.2 * loss_classification
-                    print(loss_triplet, 2 * loss_triplet, loss_classification, 0.2 * loss_classification, loss)
+                    loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
+
+                    loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
+                    loss_triplet_since_last_log += loss_weight_triplet * loss_triplet.item()
                 else:
                     raise ValueError(f'Unknown model type: {actual_model.__class__}')
 
@@ -161,6 +167,7 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
 
             total_loss += loss.item()
             loss_since_last_log += loss.item()
+
             step_since_last_log += 1
             accumulated_steps += 1
 
@@ -173,8 +180,12 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
 
                 if overall_step != 0 and overall_step % 10 == 0:
                     writer.add_scalar('Loss', loss_since_last_log / step_since_last_log, overall_step)
+                    writer.add_scalar('Loss_Classification', loss_classification_since_last_log / step_since_last_log, overall_step)
+                    writer.add_scalar('Loss_Triplet', loss_triplet_since_last_log / step_since_last_log, overall_step)
                     writer.add_scalar('Learning_Rate', optimizer.param_groups[0]['lr'], overall_step)
                     loss_since_last_log = 0
+                    loss_classification_since_last_log = 0
+                    loss_triplet_since_last_log = 0
                     step_since_last_log = 0
 
                 if overall_step != 0 and overall_step % 50 == 0:
@@ -352,6 +363,8 @@ if __name__ == '__main__':
     n_grad_accumulation_steps = yaml_config['n_grad_accumulation_steps']
     valid_batch_size = train_batch_size * yaml_config['valid_batch_size_multiplier']
     image_size = yaml_config['image_size']
+    loss_weight_triplet = yaml_config['loss_weight_triplet']
+    loss_weight_classification = yaml_config['loss_weight_classification']
     triplet_margin = yaml_config['triplet_margin']
     triplet_type = yaml_config['triplet_type']
     dropout = yaml_config['dropout']
@@ -557,6 +570,8 @@ if __name__ == '__main__':
         valid_valid_dataset_for_classification=valid_valid_dataset_quebec_for_classification,
         train_batch_size=train_batch_size,
         valid_batch_size=valid_batch_size,
+        loss_weight_triplet=loss_weight_triplet,
+        loss_weight_classification=loss_weight_classification,
         use_multi_gpu=use_multi_gpu,
         distance=distance,
         mining_func=mining_func,
