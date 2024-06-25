@@ -14,10 +14,11 @@ image_size: 768
 loss_weight_triplet: 1.0
 loss_weight_classification: 0.5
 triplet_margin: 0.2
-triplet_type: 'semihard'
+triplet_type: 'all'
 dropout: 0.5
 final_embedding_size: 1024
 scheduler_T: 10
+n_warmup_epochs: 5
 num_epochs: 100
 data_loader_num_workers: 4
 phylogenetic_tree_distances_path: /media/hugobaudchon/4 TB/XPrize/Data/phylogeny/pairs_with_dist.csv

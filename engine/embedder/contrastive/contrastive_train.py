@@ -20,6 +20,7 @@ from tensorboardX import SummaryWriter
 from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from warmup_scheduler import GradualWarmupScheduler
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
@@ -554,6 +555,7 @@ if __name__ == '__main__':
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_T)
+    scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=n_warmup_epochs, after_scheduler=scheduler)
 
     output_dir = output_folder_root / f'{output_model_name}_{int(time.time())}'
     os.makedirs(output_dir, exist_ok=True)
