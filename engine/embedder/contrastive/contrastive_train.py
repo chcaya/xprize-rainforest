@@ -11,11 +11,9 @@ import yaml
 from pytorch_metric_learning import losses, distances, reducers, miners
 from pytorch_metric_learning.distances import LpDistance
 from pytorch_metric_learning.samplers import MPerClassSampler, FixedSetOfTriplets
-from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC
 from tensorboardX import SummaryWriter
 from torch import nn
 from torch.utils.data import DataLoader
@@ -23,104 +21,18 @@ from tqdm import tqdm
 from warmup_scheduler import GradualWarmupScheduler
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
-from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
+from engine.embedder.contrastive.contrastive_infer import infer_model_with_labels
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
+    XPrizeTreeEmbedder2NoDate
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, save_model, \
     contrastive_collate_fn
 from engine.embedder.transforms import embedder_transforms
 
 
-def infer_model_without_labels(model, dataloader, device, use_mixed_precision, desc='Infering...', as_numpy=True):
-    all_embeddings = []
-    all_predicted_families = []
-
-    for images, months, days in tqdm(dataloader, total=len(dataloader), desc=desc):
-        embeddings, predicted_families = infer_batch(images=images, months=months, days=days, model=model,
-                                                     device=device, use_mixed_precision=use_mixed_precision)
-
-        all_embeddings.append(embeddings.detach().cpu())
-        all_predicted_families.append(predicted_families)
-
-    final_embeddings = torch.cat(all_embeddings, dim=0)
-    final_predicted_families = sum(all_predicted_families, [])
-
-    if as_numpy:
-        final_embeddings = final_embeddings.numpy()
-
-    return final_embeddings, final_predicted_families
-
-
-def infer_model_with_labels(model, dataloader, device, use_mixed_precision, desc='Infering...', as_numpy=True):
-    all_labels = []
-    all_labels_ids = []
-    all_families = []
-    all_families_ids = []
-    all_embeddings = []
-    all_predicted_families = []
-
-    for images, months, days, labels_ids, labels, families_ids, families in tqdm(dataloader, total=len(dataloader), desc=desc):
-        embeddings, predicted_families = infer_batch(images=images, months=months, days=days, model=model,
-                                                     device=device, use_mixed_precision=use_mixed_precision)
-
-        all_labels.append(labels)
-        all_labels_ids.append(labels_ids.cpu())
-        all_families.append(families)
-        all_families_ids.append(families_ids.cpu())
-        all_embeddings.append(embeddings.detach().cpu())
-        all_predicted_families.append(predicted_families)
-
-    final_labels = sum(all_labels, [])
-    final_labels_ids = torch.cat(all_labels_ids, dim=0)
-    final_families = sum(all_families, [])
-    final_families_ids = torch.cat(all_families_ids, dim=0)
-    final_embeddings = torch.cat(all_embeddings, dim=0)
-    final_predicted_families = sum(all_predicted_families, [])
-
-    if as_numpy:
-        final_labels = np.array(final_labels)
-        final_embeddings = final_embeddings.numpy()
-        final_labels_ids = final_labels_ids.numpy()
-
-    return final_labels, final_labels_ids, final_families, final_families_ids, final_embeddings, final_predicted_families
-
-
-def infer_batch(images, months, days, model, device, use_mixed_precision):
-    data = torch.Tensor(images).to(device)
-    months = torch.Tensor(months).to(device)
-    days = torch.Tensor(days).to(device)
-    if len(data.shape) == 3:
-        data = data.unsqueeze(0)
-
-    if use_mixed_precision:
-        with torch.cuda.amp.autocast():
-            output = model(data, months, days)
-    else:
-        output = model(data, months, days)
-
-    if isinstance(model, nn.DataParallel):
-        actual_model = model.module
-    else:
-        actual_model = model
-
-    if isinstance(actual_model, XPrizeTreeEmbedder):
-        embeddings = output
-        predicted_families = [None] * len(images)
-    elif isinstance(actual_model, XPrizeTreeEmbedder2):
-        embeddings, classifier_logits = output[0], output[1]
-        predicted_families_ids = torch.argmax(classifier_logits, dim=1)
-        predicted_families = [model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
-    else:
-        raise ValueError(f'Unknown model type: {actual_model.__class__}')
-
-    return embeddings, predicted_families
-
-
-def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
-          train_dataset: ContrastiveDataset,
-          valid_dataset: ContrastiveDataset,
-          valid_train_dataset_for_classification: ContrastiveDataset,
-          valid_valid_dataset_for_classification: ContrastiveDataset,
-          train_batch_size: int,
-          valid_batch_size: int,
+def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder2NoDate,
+          train_dataloader: DataLoader,
+          valid_train_dataloader: DataLoader,
+          valid_dataloaders: dict[str, DataLoader],
           loss_weight_triplet: float,
           loss_weight_classification: float,
           use_multi_gpu: bool,
@@ -133,22 +45,24 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
           n_grad_accumulation_steps: int,
           writer: SummaryWriter,
           output_dir: Path,
-          num_epochs: int,
-          data_loader_num_workers: int):
+          num_epochs: int):
 
     if use_multi_gpu and torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
     model.to(device)
 
-    scaler = torch.cuda.amp.GradScaler()  # Initialize the GradScaler for mixed precision training
+    model.eval()
+    with torch.no_grad():
+        validate(
+            model=model,
+            train_loader=valid_train_dataloader,
+            valid_dataloaders=valid_dataloaders,
+            distance=distance,
+            overall_step=0,
+            writer=writer
+        )
 
-    sampler = MPerClassSampler(train_dataset.all_samples_labels, m=4, batch_size=train_batch_size, length_before_new_iter=len(train_dataset))
-    data_loader = DataLoader(train_dataset,
-                             batch_size=train_batch_size,
-                             collate_fn=contrastive_collate_fn,
-                             pin_memory=use_multi_gpu,
-                             num_workers=data_loader_num_workers,
-                             sampler=sampler)
+    scaler = torch.cuda.amp.GradScaler()  # Initialize the GradScaler for mixed precision training
 
     for epoch in range(num_epochs):
         model.train()
@@ -158,10 +72,10 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
         loss_triplet_since_last_log = 0
         step_since_last_log = 0
         # re-instantiate the dataloader at the start of each epoch as the sampling was re-generated at the end of every epoch
-        overall_step = epoch * len(data_loader) // n_grad_accumulation_steps
+        overall_step = epoch * len(train_dataloader) // n_grad_accumulation_steps
         accumulated_steps = 0
 
-        for data in tqdm(data_loader, desc=f'Epoch {epoch}...'):
+        for data in tqdm(train_dataloader, desc=f'Epoch {epoch}...'):
             imgs, months, days, labels_ids, labels, families_ids, families = data
             imgs, labels_ids, families_ids = imgs.to(device), labels_ids.to(device), families_ids.to(device)
             months, days = months.to(device), days.to(device),
@@ -185,7 +99,15 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
                     model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
                     loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
                     loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
-
+                    loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
+                    loss_triplet_since_last_log += loss_weight_triplet * loss_triplet.item()
+                elif isinstance(actual_model, XPrizeTreeEmbedder2NoDate):
+                    embeddings, classifier_logits = model(imgs)
+                    indices_tuple = mining_func(embeddings, labels_ids)
+                    loss_triplet = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
+                    model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
+                    loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
+                    loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
                     loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
                     loss_triplet_since_last_log += loss_weight_triplet * loss_triplet.item()
                 else:
@@ -226,40 +148,117 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2,
             optimizer.zero_grad()
 
         model.eval()
-        validate_for_classification(
-            model=model,
-            valid_train_dataset_for_classification=valid_train_dataset_for_classification,
-            valid_valid_dataset_for_classification=valid_valid_dataset_for_classification,
-            valid_batch_size=valid_batch_size,
-            distance=distance,
-            epoch=epoch,
-            overall_step=overall_step,
-            writer=writer,
-            data_loader_num_workers=data_loader_num_workers,
-            use_multi_gpu=use_multi_gpu
-        )
-
-        valid_loss = validate_for_loss(
-            model=model,
-            valid_dataset=valid_dataset,
-            valid_batch_size=valid_batch_size,
-            criterion_metric=criterion_metric,
-            epoch=epoch,
-            overall_step=overall_step,
-            writer=writer,
-            data_loader_num_workers=data_loader_num_workers,
-            use_multi_gpu=use_multi_gpu
-        )
+        with torch.no_grad():
+            valid_loss = validate(
+                model=model,
+                train_loader=valid_train_dataloader,
+                valid_dataloaders=valid_dataloaders,
+                distance=distance,
+                overall_step=overall_step,
+                writer=writer,
+            )
 
         checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}.pth')
         save_model(model, checkpoint_output_file=checkpoint_output_file)
         scheduler.step()
         model.train()
 
-        print(f'Epoch {epoch}, Train Loss: {total_loss / len(data_loader)}, Valid Loss: {valid_loss}')
+        print(f'Epoch {epoch}, Train Loss: {total_loss / len(train_dataloader)}, Valid Loss: {valid_loss}')
+
+
+def validate(model,
+             train_loader,
+             valid_dataloaders,
+             distance,
+             overall_step,
+             writer):
+
+    train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model_with_labels(
+        model, train_loader, device, use_mixed_precision=True,
+        desc='Inferring train samples...')
+    train_to_delete = train_labels == -1
+    train_embeddings = train_embeddings[~train_to_delete]
+    train_labels = train_labels[~train_to_delete]
+    scaler_standard = StandardScaler()
+    X_train = scaler_standard.fit_transform(train_embeddings)
+
+    all_valid_embeddings = []
+    all_valid_labels_ids = []
+    total_knn_accuracy = 0
+    total_knn_macro_f1 = 0
+    total_knn_samples = 0
+
+    total_classification_accuracy = 0
+    total_classification_macro_f1 = 0
+    total_classification_samples = 0
+
+    for dataset_name, valid_dataloader in valid_dataloaders.items():
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_dataloader, device, use_mixed_precision=True, desc=f'Inferring valid samples for {dataset_name}...')
+        valid_to_delete = valid_labels == -1
+        valid_embeddings = valid_embeddings[~valid_to_delete]
+        valid_labels = valid_labels[~valid_to_delete]
+        X_test = scaler_standard.transform(valid_embeddings)
+        k_neighbors = KNeighborsClassifier(n_neighbors=5, metric=distance)
+        k_neighbors.fit(X_train, train_labels)
+        predictions = k_neighbors.predict(X_test)
+
+        all_valid_embeddings.append(valid_embeddings)
+        all_valid_labels_ids.append(valid_labels_ids)
+
+        accuracy = accuracy_score(valid_labels, predictions)
+        metrics = precision_recall_fscore_support(valid_labels, predictions, average='macro')
+        writer.add_scalar(f'Valid/{dataset_name}/KNN/Accuracy', accuracy, overall_step)
+        writer.add_scalar(f'Valid/{dataset_name}/KNN/Macro_F1', metrics[2], overall_step)
+        print(f'Validation Accuracy: KNN {dataset_name}: {accuracy}')
+
+        total_knn_accuracy += accuracy * len(valid_labels)
+        total_knn_macro_f1 += metrics[2] * len(valid_labels)
+        total_knn_samples += len(valid_labels)
+
+        if isinstance(model, nn.DataParallel):
+            actual_model = model.module
+        else:
+            actual_model = model
+
+        if isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
+            accuracy_valid = accuracy_score(valid_families, valid_predicted_families)
+            f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
+            writer.add_scalar(f'Valid/{dataset_name}/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
+            writer.add_scalar(f'Valid/{dataset_name}/Family_XPrizeTreeEmbedder2/Macro_F1', f1_macro, overall_step)
+            print(f'Validation Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_valid}')
+
+            total_classification_accuracy += accuracy_valid * len(valid_families)
+            total_classification_macro_f1 += f1_macro * len(valid_families)
+            total_classification_samples += len(valid_families)
+
+    accuracy_train = accuracy_score(train_families, train_predicted_families)
+    writer.add_scalar(f'Train/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_train, overall_step)
+    print(f'Train Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_train}')
+
+    writer.add_scalar('Valid/KNN/Accuracy', total_knn_accuracy / total_knn_samples, overall_step)
+    writer.add_scalar('Valid/KNN/Macro_F1', total_knn_macro_f1 / total_knn_samples, overall_step)
+    writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', total_classification_accuracy / total_classification_samples, overall_step)
+    writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', total_classification_macro_f1 / total_classification_samples, overall_step)
+
+    all_valid_embeddings = np.concatenate(all_valid_embeddings, axis=0)
+    all_valid_labels_ids = np.concatenate(all_valid_labels_ids, axis=0)
+    shuffled_indices = np.random.permutation(len(all_valid_labels_ids))
+    all_valid_embeddings = all_valid_embeddings[shuffled_indices]
+    all_valid_labels_ids = all_valid_labels_ids[shuffled_indices]
+
+    sampler = FixedSetOfTriplets(all_valid_labels_ids, len(all_valid_labels_ids) * 10)
+    triplets_tuples = (sampler.fixed_set_of_triplets[:, 0],
+                       sampler.fixed_set_of_triplets[:, 1],
+                       sampler.fixed_set_of_triplets[:, 2])
+    valid_loss = criterion_metric(embeddings=torch.Tensor(all_valid_embeddings).to(device), labels=torch.Tensor(all_valid_labels_ids).to(device), indices_tuple=triplets_tuples)
+    final_valid_loss = valid_loss / triplets_tuples[0].shape[0]
+    writer.add_scalar('Valid/Loss_Triplet', final_valid_loss, overall_step)
+
+    return final_valid_loss
 
 
 def validate_for_classification(model,
+                                train_dataset,
                                 valid_train_dataset_for_classification,
                                 valid_valid_dataset_for_classification,
                                 valid_batch_size,
@@ -320,7 +319,7 @@ def validate_for_classification(model,
         else:
             actual_model = model
 
-        if isinstance(actual_model, XPrizeTreeEmbedder2):
+        if isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
             accuracy_train = accuracy_score(train_families, train_predicted_families)
             accuracy_valid = accuracy_score(valid_families, valid_predicted_families)
             f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
@@ -362,7 +361,7 @@ def validate_for_loss(model,
         valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_loader, device, use_mixed_precision=False, as_numpy=False)
         total_loss = criterion_metric(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
 
-        writer.add_scalar('Valid/Loss_Triplet', total_loss / len(valid_loader), overall_step)
+        writer.add_scalar('Valid/Loss_Triplet', total_loss / triplets_tuples[0].shape[0], overall_step)
 
         return total_loss / len(valid_loader)
 
@@ -415,73 +414,36 @@ if __name__ == '__main__':
     panama_date_pattern = r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})|bci_50ha_(?P<year2>\d{4})_(?P<month2>\d{2})_(?P<day2>\d{2})_'
     quebec_date_pattern = r'^(?P<year>\d{4})_(?P<month>\d{2})_(?P<day>\d{2})_'
 
-    train_dataset_brazil = ContrastiveInternalDataset(
-        fold='train',
-        root_path=source_data_root / 'brazil_zf2',
-        date_pattern=brazil_date_pattern
-    )
-    train_dataset_equator = ContrastiveInternalDataset(
-        fold='train',
-        root_path=source_data_root / 'equator',
-        date_pattern=equator_date_pattern
-    )
-    train_dataset_panama = ContrastiveInternalDataset(
-        fold='train',
-        root_path=source_data_root / 'panama',
-        date_pattern=panama_date_pattern
-    )
-    train_dataset_quebec = ContrastiveInternalDataset(
-        fold='train',
-        root_path=source_data_root / 'quebec_trees',
-        date_pattern=quebec_date_pattern
-    )
+    train_dataset_config = {}
 
-    valid_dataset_brazil = ContrastiveInternalDataset(
-        fold='valid',
-        root_path=source_data_root / 'brazil_zf2',
-        date_pattern=brazil_date_pattern
-    )
-    valid_dataset_equator = ContrastiveInternalDataset(
-        fold='valid',
-        root_path=source_data_root / 'equator',
-        date_pattern=equator_date_pattern
-    )
-    valid_dataset_panama = ContrastiveInternalDataset(
-        fold='valid',
-        root_path=source_data_root / 'panama',
-        date_pattern=panama_date_pattern
-    )
-    valid_dataset_quebec = ContrastiveInternalDataset(
-        fold='valid',
-        root_path=source_data_root / 'quebec_trees',
-        date_pattern=quebec_date_pattern
-    )
-
-    train_dataset_config = {
-        'brazil': train_dataset_brazil,
-        'equator': train_dataset_equator,
-        'panama': train_dataset_panama,
-        'quebec': train_dataset_quebec
-    }
-    valid_dataset_config = {
-        'brazil': train_dataset_brazil,
-        'equator': train_dataset_equator,
-        'panama': valid_dataset_panama,
-        'quebec': valid_dataset_quebec
-    }
-
-    if 'brazil' not in use_datasets:
-        del train_dataset_config['brazil']
-        del valid_dataset_config['brazil']
-    if 'equator' not in use_datasets:
-        del train_dataset_config['equator']
-        del valid_dataset_config['equator']
-    if 'panama' not in use_datasets:
-        del train_dataset_config['panama']
-        del valid_dataset_config['panama']
-    if 'quebec' not in use_datasets:
-        del train_dataset_config['quebec']
-        del valid_dataset_config['quebec']
+    if 'brazil' in use_datasets:
+        train_dataset_brazil = ContrastiveInternalDataset(
+            fold='train',
+            root_path=source_data_root / 'brazil_zf2',
+            date_pattern=brazil_date_pattern
+        )
+        train_dataset_config['brazil'] = train_dataset_brazil
+    if 'equator' in use_datasets:
+        train_dataset_equator = ContrastiveInternalDataset(
+            fold='train',
+            root_path=source_data_root / 'equator',
+            date_pattern=equator_date_pattern
+        )
+        train_dataset_config['equator'] = train_dataset_equator
+    if 'panama' in use_datasets:
+        train_dataset_panama = ContrastiveInternalDataset(
+            fold='train',
+            root_path=source_data_root / 'panama',
+            date_pattern=panama_date_pattern
+        )
+        train_dataset_config['panama'] = train_dataset_panama
+    if 'quebec' in use_datasets:
+        train_dataset_quebec = ContrastiveInternalDataset(
+            fold='train',
+            root_path=source_data_root / 'quebec_trees',
+            date_pattern=quebec_date_pattern
+        )
+        train_dataset_config['quebec'] = train_dataset_quebec
 
     siamese_sampler_dataset_train = ContrastiveDataset(
         dataset_config=train_dataset_config,
@@ -494,75 +456,97 @@ if __name__ == '__main__':
         taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
     )
 
-    siamese_sampler_dataset_valid = ContrastiveDataset(
-        dataset_config=valid_dataset_config,
-        min_level=min_level,
-        image_size=image_size,
-        transform=None,
-        normalize=True,
-        mean=FOREST_QPEB_MEAN,
-        std=FOREST_QPEB_STD,
-        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
-    )
-    siamese_sampler_dataset_valid.shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
-
-    # Preparing the Quebec datasets for classification validation
-    quebec_detection_root = source_data_root / 'quebec_trees/from_detector'
-    quebec_folders = [x for x in quebec_detection_root.iterdir() if x.is_dir()]
-    if '2021_09_02' in quebec_classification_dates:
-        quebec_folders_keep = [source_data_root / 'quebec_trees/from_annotations']
-        quebec_classification_dates = [x for x in quebec_classification_dates if x != '2021_09_02']
-    else:
-        quebec_folders_keep = []
-    quebec_folders_keep += [x for x in quebec_folders if any(date in x.name for date in quebec_classification_dates)]
-
-    valid_train_dataset_quebec = ContrastiveInternalDataset(
-        fold='train',
-        root_path=quebec_folders_keep,
-        date_pattern=quebec_date_pattern
-    )
-    valid_valid_dataset_quebec = ContrastiveInternalDataset(
-        fold='valid',
-        root_path=quebec_folders_keep,
-        date_pattern=quebec_date_pattern
-    )
-
-    valid_train_dataset_quebec_for_classification = ContrastiveDataset(
-        dataset_config={'quebec': valid_train_dataset_quebec},
-        min_level=min_level,
-        image_size=image_size,
-        transform=A.Compose(embedder_transforms),
-        normalize=True,
-        mean=FOREST_QPEB_MEAN,
-        std=FOREST_QPEB_STD,
-        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
-    )
-
-    valid_valid_dataset_quebec_for_classification = ContrastiveDataset(
-        dataset_config={'quebec': valid_valid_dataset_quebec},
-        min_level=min_level,
-        image_size=image_size,
-        transform=None,
-        normalize=True,
-        mean=FOREST_QPEB_MEAN,
-        std=FOREST_QPEB_STD,
-        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
-    )
+    valid_datasets = {}
+    if 'brazil' in use_datasets:
+        valid_dataset_brazil = ContrastiveInternalDataset(
+            fold='valid',
+            root_path=source_data_root / 'brazil_zf2',
+            date_pattern=brazil_date_pattern
+        )
+        valid_datasets['brazil'] = ContrastiveDataset(
+            dataset_config={'brazil': valid_dataset_brazil},
+            min_level=min_level,
+            image_size=image_size,
+            transform=None,
+            normalize=True,
+            mean=FOREST_QPEB_MEAN,
+            std=FOREST_QPEB_STD,
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        )
+        valid_datasets['brazil'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
+    if 'equator' in use_datasets:
+        valid_dataset_equator = ContrastiveInternalDataset(
+            fold='valid',
+            root_path=source_data_root / 'equator',
+            date_pattern=equator_date_pattern
+        )
+        valid_datasets['equator'] = ContrastiveDataset(
+            dataset_config={'equator': valid_dataset_equator},
+            min_level=min_level,
+            image_size=image_size,
+            transform=None,
+            normalize=True,
+            mean=FOREST_QPEB_MEAN,
+            std=FOREST_QPEB_STD,
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        )
+        valid_datasets['equator'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
+    if 'panama' in use_datasets:
+        valid_dataset_panama = ContrastiveInternalDataset(
+            fold='valid',
+            root_path=source_data_root / 'panama',
+            date_pattern=panama_date_pattern
+        )
+        valid_datasets['panama'] = ContrastiveDataset(
+            dataset_config={'panama': valid_dataset_panama},
+            min_level=min_level,
+            image_size=image_size,
+            transform=None,
+            normalize=True,
+            mean=FOREST_QPEB_MEAN,
+            std=FOREST_QPEB_STD,
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        )
+        valid_datasets['panama'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
+    if 'quebec' in use_datasets:
+        valid_dataset_quebec = ContrastiveInternalDataset(
+            fold='valid',
+            root_path=source_data_root / 'quebec_trees',
+            date_pattern=quebec_date_pattern
+        )
+        valid_datasets['quebec'] = ContrastiveDataset(
+            dataset_config={'quebec': valid_dataset_quebec},
+            min_level=min_level,
+            image_size=image_size,
+            transform=None,
+            normalize=True,
+            mean=FOREST_QPEB_MEAN,
+            std=FOREST_QPEB_STD,
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        )
+        valid_datasets['quebec'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
 
     print('Datasets loaded successfully.')
 
-    model = XPrizeTreeEmbedder2(
+    # model = XPrizeTreeEmbedder2(
+    #     resnet_model=resnet_model,
+    #     final_embedding_size=final_embedding_size,
+    #     dropout=dropout,
+    #     date_embedding_dim=32,
+    #     families=list(siamese_sampler_dataset_train.families_set),
+    # ).to(device)
+
+    model = XPrizeTreeEmbedder2NoDate(
         resnet_model=resnet_model,
         final_embedding_size=final_embedding_size,
         dropout=dropout,
-        date_embedding_dim=32,
         families=list(siamese_sampler_dataset_train.families_set),
     ).to(device)
 
     if start_from_checkpoint:
         if isinstance(model, XPrizeTreeEmbedder):
             model.load_state_dict(torch.load(start_from_checkpoint))
-        elif isinstance(model, XPrizeTreeEmbedder2):
+        elif isinstance(model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
             model = model.from_checkpoint(start_from_checkpoint)
         else:
             raise ValueError(f'Unknown model type: {model.__class__}')
@@ -585,6 +569,8 @@ if __name__ == '__main__':
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_T)
     scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=n_warmup_epochs, after_scheduler=scheduler)
+    optimizer.step()  # Step once to avoid lr of 0 from scheduler
+    scheduler.step()  # Step once to avoid lr of 0 from scheduler
 
     output_dir = output_folder_root / f'{output_model_name}_{int(time.time())}'
     os.makedirs(output_dir, exist_ok=True)
@@ -593,14 +579,39 @@ if __name__ == '__main__':
     with open(output_dir / 'contrastive_train_config.yaml', 'w') as config_file:
         yaml.safe_dump(yaml_config, config_file)
 
+    train_sampler = MPerClassSampler(siamese_sampler_dataset_train.all_samples_labels, m=4, batch_size=train_batch_size, length_before_new_iter=len(siamese_sampler_dataset_train))
+    train_dataloader = DataLoader(
+        siamese_sampler_dataset_train,
+        batch_size=train_batch_size,
+        collate_fn=contrastive_collate_fn,
+        pin_memory=use_multi_gpu,
+        num_workers=data_loader_num_workers,
+        sampler=train_sampler
+    )
+
+    valid_train_dataloader = DataLoader(
+        siamese_sampler_dataset_train,
+        batch_size=train_batch_size,
+        collate_fn=contrastive_collate_fn,
+        pin_memory=use_multi_gpu,
+        num_workers=data_loader_num_workers
+    )
+
+    valid_dataloaders = {}
+    for valid_dataset_name, valid_dataset in valid_datasets.items():
+        valid_dataloaders[valid_dataset_name] = torch.utils.data.DataLoader(
+            valid_dataset,
+            batch_size=valid_batch_size,
+            shuffle=False,
+            num_workers=data_loader_num_workers,
+            collate_fn=contrastive_collate_fn
+        )
+
     train(
         model=model,
-        train_dataset=siamese_sampler_dataset_train,
-        valid_dataset=siamese_sampler_dataset_valid,
-        valid_train_dataset_for_classification=valid_train_dataset_quebec_for_classification,
-        valid_valid_dataset_for_classification=valid_valid_dataset_quebec_for_classification,
-        train_batch_size=train_batch_size,
-        valid_batch_size=valid_batch_size,
+        train_dataloader=train_dataloader,
+        valid_train_dataloader=valid_train_dataloader,
+        valid_dataloaders=valid_dataloaders,
         loss_weight_triplet=loss_weight_triplet,
         loss_weight_classification=loss_weight_classification,
         use_multi_gpu=use_multi_gpu,
@@ -614,6 +625,5 @@ if __name__ == '__main__':
         writer=writer,
         output_dir=output_dir,
         num_epochs=num_epochs,
-        data_loader_num_workers=data_loader_num_workers
     )
 

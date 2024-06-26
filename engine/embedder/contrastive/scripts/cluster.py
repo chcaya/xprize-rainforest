@@ -10,8 +10,8 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
-from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder
-from engine.embedder.contrastive.contrastive_train import infer_model
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
+from engine.embedder.contrastive.contrastive_train import infer_model_with_labels
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, contrastive_collate_fn
 
 if __name__ == "__main__":
@@ -21,16 +21,17 @@ if __name__ == "__main__":
     phylogenetic_tree_distances_path = '/home/hugo/Documents/xprize/data/pairs_with_dist.csv'
     metric = 'cosine' #'euclidean'
     # checkpoint = '/home/hugo/Documents/xprize/trainings/contrastive_resnet50_256_1024_144_mpt_1719085279/checkpoint_7.pth'
-    checkpoint = '/home/hugo/Documents/xprize/training_alliance_canada/min_genus/checkpoint_27.pth'
+    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719359822/checkpoint_7.pth'
     # checkpoint = '/home/hugo/Documents/xprize/training_alliance_canada/min_family/checkpoint_29.pth'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     image_size = 768
-    model = XPrizeTreeEmbedder(
-        resnet_model='resnet50',
-        final_embedding_size=1024,
-        dropout=0.5
-    ).to(device)
-    model.load_state_dict(torch.load(checkpoint))
+    # model = XPrizeTreeEmbedder2(
+    #     resnet_model='resnet50',
+    #     final_embedding_size=1024,
+    #     dropout=0.5
+    # ).to(device)
+    model = XPrizeTreeEmbedder2.from_checkpoint(checkpoint).to(device)
+    # model.load_state_dict(torch.load(checkpoint))
     model.eval()
 
     brazil_date_pattern = r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})'
@@ -79,12 +80,13 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=4, collate_fn=contrastive_collate_fn)
-
-        labels, labels_ids, embeddings = infer_model(model, loader, device,
-                                                     use_multi_gpu=False,
-                                                     use_mixed_precision=False)
+        labels, labels_ids, families, families_ids, embeddings, predicted_families = infer_model_with_labels(model, loader, device,
+                                                                                        use_mixed_precision=False)
 
     embeddings_np = embeddings.cpu().numpy() if isinstance(embeddings, torch.Tensor) else np.array(embeddings)
+
+    df = pd.DataFrame({'embeddings': list(embeddings_np), 'labels': labels, 'family': families})
+    df.to_csv('./embeddings.csv', index=False)
 
     # # Apply K-Means clustering
     # kmeans = KMeans(n_clusters=n_clusters, random_state=42)

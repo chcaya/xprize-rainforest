@@ -5,7 +5,8 @@ import heapq
 
 from torch import nn
 
-from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
+    XPrizeTreeEmbedder2NoDate
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
 IMAGENET_STD = np.array([0.229, 0.224, 0.225])
@@ -40,7 +41,7 @@ def save_model(model, checkpoint_output_file):
 
     if isinstance(actual_model, XPrizeTreeEmbedder):
         torch.save(actual_model.state_dict(), checkpoint_output_file)
-    elif isinstance(actual_model, XPrizeTreeEmbedder2):
+    elif isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
         actual_model.save(checkpoint_output_file)
     else:
         raise NotImplementedError(f"Model type not supported for saving: {type(actual_model)}.")
@@ -91,4 +92,18 @@ def contrastive_infer_collate_fn(batch):
     images_padded = pad_and_stack_images(images)
 
     return images_padded, months, days
+
+
+class ConditionalAutocast:
+    def __init__(self, condition):
+        self.condition = condition
+        self.autocast = torch.cuda.amp.autocast() if self.condition else None
+
+    def __enter__(self):
+        if self.autocast:
+            self.autocast.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.autocast:
+            self.autocast.__exit__(exc_type, exc_val, exc_tb)
 

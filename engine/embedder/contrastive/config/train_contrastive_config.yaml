@@ -1,4 +1,4 @@
-source_data_root: /media/hugobaudchon/4 TB/XPrize/Data/pre_processed/FINAL_polygon_dataset_1536px_gr0p03
+source_data_root: /home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03
 use_datasets: ['quebec', 'equator']  #['quebec', 'panama', 'equator', 'brazil']
 min_level: 'genus'
 distance: 'euclidean'  # cosine
@@ -6,14 +6,14 @@ quebec_classification_dates: ['2021_05_28', '2021_09_02', '2021_10_07']
 resnet_model: resnet50
 use_multi_gpu: true
 start_from_checkpoint: null  # "/home/hugo/Documents/xprize/trainings/contrastive_resnet50_768_1024_144_mpt_1719091279/checkpoint_0.pth"
-learning_rate: 0.0001  # 0.0001
-train_batch_size: 24
-n_grad_accumulation_steps: 4
+learning_rate: 0.0002  # 0.0001
+train_batch_size: 32
+n_grad_accumulation_steps: 2
 valid_batch_size_multiplier: 1
 image_size: 768
 loss_weight_triplet: 1.0
-loss_weight_classification: 0.5
-triplet_margin: 0.2
+loss_weight_classification: 1.5
+triplet_margin: 0.5
 triplet_type: 'all'
 dropout: 0.5
 final_embedding_size: 1024
@@ -21,5 +21,5 @@ scheduler_T: 10
 n_warmup_epochs: 5
 num_epochs: 100
 data_loader_num_workers: 4
-phylogenetic_tree_distances_path: /media/hugobaudchon/4 TB/XPrize/Data/phylogeny/pairs_with_dist.csv
-output_folder_root: /media/hugobaudchon/4 TB/XPrize/trainings_2
+phylogenetic_tree_distances_path: /home/hugo/Documents/xprize/data/pairs_with_dist.csv
+output_folder_root: /home/hugo/Documents/xprize/trainings_2

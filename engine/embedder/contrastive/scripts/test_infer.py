@@ -12,7 +12,7 @@ from sklearn.manifold import TSNE
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset, \
     ContrastiveInferDataset
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
-from engine.embedder.contrastive.contrastive_train import infer_model_with_labels, infer_model_without_labels
+from engine.embedder.contrastive.contrastive_infer import infer_model_without_labels, infer_model_with_labels
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, contrastive_collate_fn, \
     contrastive_infer_collate_fn
 
