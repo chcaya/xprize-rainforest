@@ -6,7 +6,7 @@ laspy==2.5.3
 numpy>=1.25.0
 pandas>=2.2.0
 psutil==5.9.3
-pytorch-gradual-warmup-lr @ git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git@6b5e8953a80aef5b324104dc0c2e9b8c34d622bd
+warmup-scheduler @ git+https://github.com/ildoonet/pytorch-gradual-warmup-lr.git@6b5e8953a80aef5b324104dc0c2e9b8c34d622bd
 pytorch-metric-learning>=2.3.0
 PyYAML==6.0.1
 rasterio==1.3.7
