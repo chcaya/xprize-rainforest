@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from pympler import asizeof
 from torch import nn
 from tqdm import tqdm
 
