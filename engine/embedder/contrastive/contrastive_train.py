@@ -26,7 +26,7 @@ from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XP
     XPrizeTreeEmbedder2NoDate
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, save_model, \
     contrastive_collate_fn
-from engine.embedder.transforms import embedder_transforms
+from engine.embedder.transforms import embedder_transforms_v2, embedder_simple_transforms_v2
 
 
 def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder2NoDate,
@@ -45,7 +45,8 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
           n_grad_accumulation_steps: int,
           writer: SummaryWriter,
           output_dir: Path,
-          num_epochs: int):
+          num_epochs: int,
+          valid_knn_k: int):
 
     if use_multi_gpu and torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
@@ -59,7 +60,8 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
             valid_dataloaders=valid_dataloaders,
             distance=distance,
             overall_step=0,
-            writer=writer
+            writer=writer,
+            valid_knn_k=valid_knn_k
         )
 
     scaler = torch.cuda.amp.GradScaler()  # Initialize the GradScaler for mixed precision training
@@ -156,9 +158,10 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
                 distance=distance,
                 overall_step=overall_step,
                 writer=writer,
+                valid_knn_k=valid_knn_k
             )
 
-        checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}.pth')
+        checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
         save_model(model, checkpoint_output_file=checkpoint_output_file)
         scheduler.step()
         model.train()
@@ -171,7 +174,8 @@ def validate(model,
              valid_dataloaders,
              distance,
              overall_step,
-             writer):
+             writer,
+             valid_knn_k):
 
     train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model_with_labels(
         model, train_loader, device, use_mixed_precision=True,
@@ -198,7 +202,7 @@ def validate(model,
         valid_embeddings = valid_embeddings[~valid_to_delete]
         valid_labels = valid_labels[~valid_to_delete]
         X_test = scaler_standard.transform(valid_embeddings)
-        k_neighbors = KNeighborsClassifier(n_neighbors=5, metric=distance)
+        k_neighbors = KNeighborsClassifier(n_neighbors=valid_knn_k, metric=distance)
         k_neighbors.fit(X_train, train_labels)
         predictions = k_neighbors.predict(X_test)
 
@@ -225,7 +229,7 @@ def validate(model,
             f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
             writer.add_scalar(f'Valid/{dataset_name}/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
             writer.add_scalar(f'Valid/{dataset_name}/Family_XPrizeTreeEmbedder2/Macro_F1', f1_macro, overall_step)
-            print(f'Validation Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_valid}')
+            print(f'Validation Accuracy: Family_XPrizeTreeEmbedder2 {dataset_name}: {accuracy_valid}')
 
             total_classification_accuracy += accuracy_valid * len(valid_families)
             total_classification_macro_f1 += f1_macro * len(valid_families)
@@ -380,9 +384,11 @@ if __name__ == '__main__':
         source_data_root = Path(args.data_root)
 
     use_datasets = yaml_config['use_datasets']
+    max_resampling_times_train = yaml_config['max_resampling_times_train']
+    max_resampling_times_valid_train = yaml_config['max_resampling_times_valid_train']
+    valid_knn_k = yaml_config['valid_knn_k']
     min_level = yaml_config['min_level']
     distance = yaml_config['distance']
-    quebec_classification_dates = yaml_config['quebec_classification_dates']
     resnet_model = yaml_config['resnet_model']
     use_multi_gpu = yaml_config['use_multi_gpu']
     start_from_checkpoint = yaml_config['start_from_checkpoint']
@@ -449,11 +455,24 @@ if __name__ == '__main__':
         dataset_config=train_dataset_config,
         min_level=min_level,
         image_size=image_size,
-        transform=A.Compose(embedder_transforms),
+        transform=A.Compose(embedder_transforms_v2),
         normalize=True,
         mean=FOREST_QPEB_MEAN,
         std=FOREST_QPEB_STD,
-        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+        max_resampling_times=max_resampling_times_train
+    )
+
+    siamese_sampler_dataset_valid_knn_train = ContrastiveDataset(
+        dataset_config=train_dataset_config,
+        min_level=min_level,
+        image_size=image_size,
+        transform=A.Compose(embedder_simple_transforms_v2),
+        normalize=True,
+        mean=FOREST_QPEB_MEAN,
+        std=FOREST_QPEB_STD,
+        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+        max_resampling_times=max_resampling_times_valid_train
     )
 
     valid_datasets = {}
@@ -471,7 +490,8 @@ if __name__ == '__main__':
             normalize=True,
             mean=FOREST_QPEB_MEAN,
             std=FOREST_QPEB_STD,
-            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+            max_resampling_times=0
         )
         valid_datasets['brazil'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
     if 'equator' in use_datasets:
@@ -488,7 +508,8 @@ if __name__ == '__main__':
             normalize=True,
             mean=FOREST_QPEB_MEAN,
             std=FOREST_QPEB_STD,
-            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+            max_resampling_times=0
         )
         valid_datasets['equator'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
     if 'panama' in use_datasets:
@@ -505,7 +526,8 @@ if __name__ == '__main__':
             normalize=True,
             mean=FOREST_QPEB_MEAN,
             std=FOREST_QPEB_STD,
-            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+            max_resampling_times=0
         )
         valid_datasets['panama'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
     if 'quebec' in use_datasets:
@@ -522,7 +544,8 @@ if __name__ == '__main__':
             normalize=True,
             mean=FOREST_QPEB_MEAN,
             std=FOREST_QPEB_STD,
-            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+            taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+            max_resampling_times=0
         )
         valid_datasets['quebec'].shuffle(seed=0)       # shuffling once to make sure species labels are well mixed for mini-batches
 
@@ -586,11 +609,11 @@ if __name__ == '__main__':
         collate_fn=contrastive_collate_fn,
         pin_memory=use_multi_gpu,
         num_workers=data_loader_num_workers,
-        sampler=train_sampler
+        sampler=train_sampler,
     )
 
     valid_train_dataloader = DataLoader(
-        siamese_sampler_dataset_train,
+        siamese_sampler_dataset_valid_knn_train,
         batch_size=train_batch_size,
         collate_fn=contrastive_collate_fn,
         pin_memory=use_multi_gpu,
@@ -625,5 +648,6 @@ if __name__ == '__main__':
         writer=writer,
         output_dir=output_dir,
         num_epochs=num_epochs,
+        valid_knn_k=valid_knn_k
     )
 

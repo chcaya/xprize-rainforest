@@ -10,7 +10,8 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
-from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2
+from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
+    XPrizeTreeEmbedder2NoDate
 from engine.embedder.contrastive.contrastive_train import infer_model_with_labels
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, contrastive_collate_fn
 
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     phylogenetic_tree_distances_path = '/home/hugo/Documents/xprize/data/pairs_with_dist.csv'
     metric = 'cosine' #'euclidean'
     # checkpoint = '/home/hugo/Documents/xprize/trainings/contrastive_resnet50_256_1024_144_mpt_1719085279/checkpoint_7.pth'
-    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719359822/checkpoint_7.pth'
+    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719430612/checkpoint_10.pth'
     # checkpoint = '/home/hugo/Documents/xprize/training_alliance_canada/min_family/checkpoint_29.pth'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     image_size = 768
@@ -30,7 +31,7 @@ if __name__ == "__main__":
     #     final_embedding_size=1024,
     #     dropout=0.5
     # ).to(device)
-    model = XPrizeTreeEmbedder2.from_checkpoint(checkpoint).to(device)
+    model = XPrizeTreeEmbedder2NoDate.from_checkpoint(checkpoint).to(device)
     # model.load_state_dict(torch.load(checkpoint))
     model.eval()
 
@@ -47,7 +48,7 @@ if __name__ == "__main__":
 
     test_dataset_quebec = ContrastiveInternalDataset(
         fold='test',
-        root_path=source_data_root / 'quebec_trees/from_annotations',
+        root_path=source_data_root / 'quebec_trees',
         date_pattern=quebec_date_pattern
     )
 
@@ -79,14 +80,14 @@ if __name__ == "__main__":
     )
 
     with torch.no_grad():
-        loader = torch.utils.data.DataLoader(dataset, batch_size=32, shuffle=False, num_workers=4, collate_fn=contrastive_collate_fn)
+        loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False, num_workers=4, collate_fn=contrastive_collate_fn)
         labels, labels_ids, families, families_ids, embeddings, predicted_families = infer_model_with_labels(model, loader, device,
                                                                                         use_mixed_precision=False)
 
     embeddings_np = embeddings.cpu().numpy() if isinstance(embeddings, torch.Tensor) else np.array(embeddings)
 
     df = pd.DataFrame({'embeddings': list(embeddings_np), 'labels': labels, 'family': families})
-    df.to_csv('./embeddings.csv', index=False)
+    df.to_csv('./embeddings_quebec.csv', index=False)
 
     # # Apply K-Means clustering
     # kmeans = KMeans(n_clusters=n_clusters, random_state=42)
@@ -139,70 +140,22 @@ if __name__ == "__main__":
     plt.legend(title="True Labels")
     plt.show()
 
-    # pca = PCA(n_components=100, random_state=42)
-    # reduced_embeddings_100 = pca.fit_transform(embeddings_np)
-    # kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    # cluster_labels_100 = kmeans.fit_predict(reduced_embeddings_100)
-    #
-    # label_counts = Counter(labels)
-    # # Select the top 10 most frequent labels
-    # # top_labels = [label for label, count in label_counts.most_common(10)]
-    # top_labels = list(set(labels))
-    #
-    # # Compute t-SNE
-    # tsne = TSNE(n_components=2, random_state=42, metric=metric)
-    # reduced_embeddings = tsne.fit_transform(embeddings_np)
-    #
-    # # Plotting
-    # plt.figure(figsize=(27, 8))
-    #
-    # # Plot with true labels
-    # plt.subplot(1, 3, 1)
-    # cmap = plt.get_cmap('jet', len(top_labels))  # Get a colormap with as many colors as top labels
-    #
-    # for i, label in enumerate(top_labels):
-    #     idx = labels == label
-    #     plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(i), label=f'{label}', alpha=0.5)
-    #
-    # plt.colorbar(ticks=range(len(top_labels)), label='Label index', boundaries=np.arange(len(top_labels) + 1) - 0.5,
-    #              spacing='proportional')
-    # plt.clim(-0.5, len(top_labels) - 0.5)
-    # plt.title('t-SNE of Embeddings with True Labels')
-    # plt.xlabel('Component 1')
-    # plt.ylabel('Component 2')
-    # plt.legend(title="True Labels")
-    #
-    # # Plot with cluster IDs
-    # plt.subplot(1, 3, 2)
-    # cmap = plt.get_cmap('jet', n_clusters)
-    #
-    # for i in range(n_clusters):
-    #     idx = cluster_labels_1024 == i
-    #     plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(i), label=f'Cluster {i}', alpha=0.5)
-    #
-    # plt.colorbar(ticks=range(n_clusters), label='Cluster index', boundaries=np.arange(n_clusters + 1) - 0.5,
-    #              spacing='proportional')
-    # plt.clim(-0.5, n_clusters - 0.5)
-    # plt.title('t-SNE of Embeddings with Cluster IDs, full embeddings')
-    # plt.xlabel('Component 1')
-    # plt.ylabel('Component 2')
-    # plt.legend(title="Cluster IDs")
-    #
-    # # Plot with cluster IDs
-    # plt.subplot(1, 3, 3)
-    # cmap = plt.get_cmap('jet', n_clusters)
-    #
-    # for i in range(n_clusters):
-    #     idx = cluster_labels_100 == i
-    #     plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(i), label=f'Cluster {i}', alpha=0.5)
-    #
-    # plt.colorbar(ticks=range(n_clusters), label='Cluster index', boundaries=np.arange(n_clusters + 1) - 0.5,
-    #              spacing='proportional')
-    # plt.clim(-0.5, n_clusters - 0.5)
-    # plt.title('t-SNE of Embeddings with Cluster IDs, reduced embeddings')
-    # plt.xlabel('Component 1')
-    # plt.ylabel('Component 2')
-    # plt.legend(title="Cluster IDs")
-    #
-    # plt.show()
+    plt.figure(figsize=(10, 10))
+
+    cmap = plt.get_cmap('jet', len(top_labels))  # Get a colormap with as many colors as top labels
+
+    for i, label in enumerate(top_labels):
+        idx = labels == label
+        plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(i), label=f'{label}', alpha=0.8)
+
+    plt.colorbar(ticks=range(len(top_labels)), label='Label index', boundaries=np.arange(len(top_labels) + 1) - 0.5,
+                 spacing='proportional')
+    plt.clim(-0.5, len(top_labels) - 0.5)
+    plt.title('t-SNE of Embeddings with True Labels')
+    plt.xlabel('Component 1')
+    plt.ylabel('Component 2')
+    plt.legend(title="True Labels")
+
+    plt.show()
+
 

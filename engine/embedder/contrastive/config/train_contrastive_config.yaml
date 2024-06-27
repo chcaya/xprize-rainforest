@@ -1,8 +1,10 @@
 source_data_root: /home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03
-use_datasets: ['quebec', 'equator']  #['quebec', 'panama', 'equator', 'brazil']
+use_datasets: ['quebec', 'equator', 'brazil']  #['quebec', 'panama', 'equator', 'brazil']
+max_resampling_times_train: 50
+max_resampling_times_valid_train: 4
+valid_knn_k: 5
 min_level: 'genus'
 distance: 'euclidean'  # cosine
-quebec_classification_dates: ['2021_05_28', '2021_09_02', '2021_10_07']
 resnet_model: resnet50
 use_multi_gpu: true
 start_from_checkpoint: null  # "/home/hugo/Documents/xprize/trainings/contrastive_resnet50_768_1024_144_mpt_1719091279/checkpoint_0.pth"
@@ -17,7 +19,7 @@ triplet_margin: 0.5
 triplet_type: 'all'
 dropout: 0.5
 final_embedding_size: 1024
-scheduler_T: 10
+scheduler_T: 30
 n_warmup_epochs: 5
 num_epochs: 100
 data_loader_num_workers: 4

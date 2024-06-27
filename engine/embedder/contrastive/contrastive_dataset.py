@@ -81,6 +81,7 @@ class ContrastiveDataset:
                  image_size: int,
                  transform: albumentations.core.composition.Compose,
                  taxa_distances_df: pd.DataFrame or None,
+                 max_resampling_times: int,
                  normalize: bool = True,
                  mean: np.array = FOREST_QPEB_MEAN,
                  std: np.array = FOREST_QPEB_STD,
@@ -96,6 +97,7 @@ class ContrastiveDataset:
         self.std = std
         self.min_margin = min_margin
         self.max_margin = max_margin
+        self.max_resampling_times = max_resampling_times
 
         self.datasets = dataset_config
 
@@ -113,14 +115,16 @@ class ContrastiveDataset:
             )
 
         self.categories_names, self.categories_names_to_idx, self.categories_dists = self._get_categories_distances()
-        self.all_samples_labels, self.all_samples_families, self.all_samples_indices, self.samples_indices_per_label = self._get_all_samples()
+        self.all_samples_labels, self.all_samples_families, self.all_samples_dataset_indices, self.samples_indices_per_label = self._get_all_samples()
         self.families_set = set(self.all_samples_families)
         self._remove_not_represented_categories()
 
         sorted_dict = {k: len(v) for k, v in sorted(self.samples_indices_per_label.items(), key=lambda item: len(item[1]), reverse=True)}
-        # Print the sorted dictionary
-        for key, value in sorted_dict.items():
-            print(f'{key} => {value}')
+        print(f'Categories representation BEFORE category balancing: {sorted_dict}')
+
+        self._equilibrate_classes()
+        sorted_dict = {k: len(v) for k, v in sorted(self.samples_indices_per_label.items(), key=lambda item: len(item[1]), reverse=True)}
+        print(f'Categories representation AFTER category balancing: {sorted_dict}')
 
         self.index = [i for i in range(len(self))]
 
@@ -181,7 +185,7 @@ class ContrastiveDataset:
         return categories_names, categories_names_to_idx, categories_dists
 
     def _get_all_samples(self):
-        all_samples_indices = {}
+        all_samples_dataset_indices = {}
         all_samples_labels = []
         all_samples_families = []
         samples_indices_per_label = {k: [] for k in self.categories_names}
@@ -193,7 +197,7 @@ class ContrastiveDataset:
                 if category_id:
                     category_name = dataset.category_id_to_metadata_mapping[category_id]['name']
                     if category_name == 'Dead':
-                        all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                        all_samples_dataset_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                         all_samples_labels.append(category_name)
                         all_samples_families.append(category_name)
                         samples_indices_per_label[category_name].append(global_sample_id)
@@ -216,7 +220,7 @@ class ContrastiveDataset:
 
                     if self.min_level == 'species':
                         if category_name in self.categories_names:
-                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_dataset_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(category_name)
                             all_samples_families.append(family_name)
                             samples_indices_per_label[category_name].append(global_sample_id)
@@ -224,7 +228,7 @@ class ContrastiveDataset:
 
                     elif self.min_level == 'genus':
                         if genus_name in self.categories_names:
-                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_dataset_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(genus_name)
                             all_samples_families.append(family_name)
                             samples_indices_per_label[genus_name].append(global_sample_id)
@@ -232,24 +236,43 @@ class ContrastiveDataset:
 
                     elif self.min_level == 'family':
                         if family_name in self.categories_names:
-                            all_samples_indices[global_sample_id] = [dataset_key, dataset_sample_id]
+                            all_samples_dataset_indices[global_sample_id] = [dataset_key, dataset_sample_id]
                             all_samples_labels.append(family_name)
                             all_samples_families.append(family_name)
                             samples_indices_per_label[family_name].append(global_sample_id)
                             global_sample_id += 1
 
-        return all_samples_labels, all_samples_families, all_samples_indices, samples_indices_per_label
+        return all_samples_labels, all_samples_families, all_samples_dataset_indices, samples_indices_per_label
 
     def _remove_not_represented_categories(self):
         self.categories_names = set([k for k in self.categories_names if len(self.samples_indices_per_label[k]) != 0])
         self.samples_indices_per_label = {k: v for k, v in self.samples_indices_per_label.items() if len(v) != 0}
 
+    def _equilibrate_classes(self):
+        if self.max_resampling_times > 0:
+            # get the mean and median values of samples per class
+            mean_samples_per_class = int(np.mean([len(v) for v in self.samples_indices_per_label.values()]))
+            print(f"Mean samples per class: {mean_samples_per_class}")
+
+            next_index = len(self.all_samples_dataset_indices)
+            for category_name in self.categories_names:
+                samples_for_category = self.samples_indices_per_label[category_name]
+                if len(samples_for_category) < mean_samples_per_class:
+                    shuffled_indices = np.random.choice(samples_for_category, size=int(mean_samples_per_class - len(samples_for_category)), replace=True)
+                    shuffled_indices = shuffled_indices[:min(mean_samples_per_class, self.max_resampling_times * len(samples_for_category))]
+                    for idx_to_be_duplicated in shuffled_indices:
+                        self.all_samples_dataset_indices[next_index] = self.all_samples_dataset_indices[idx_to_be_duplicated]
+                        self.all_samples_labels.append(self.all_samples_labels[idx_to_be_duplicated])
+                        self.all_samples_families.append(self.all_samples_families[idx_to_be_duplicated])
+                        self.samples_indices_per_label[category_name].append(next_index)
+                        next_index += 1
+
     def __len__(self):
-        return len(self.all_samples_indices)
+        return len(self.all_samples_dataset_indices)
 
     def __getitem__(self, idx):
         real_idx = self.index[idx]
-        dataset_key, dataset_idx = self.all_samples_indices[real_idx]
+        dataset_key, dataset_idx = self.all_samples_dataset_indices[real_idx]
         label = self.all_samples_labels[real_idx]
         label_id = self.categories_names_to_idx[label]
         family = self.all_samples_families[real_idx]
