@@ -96,7 +96,7 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
                     embeddings, classifier_logits = model(imgs, months, days)
                     indices_tuple = mining_func(embeddings, labels_ids)
                     loss_triplet = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
-                    model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
+                    model_compatible_labels = torch.Tensor([actual_model.families_to_id_mapping[family] for family in families]).long().to(device)
                     loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
                     loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
                     loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
@@ -105,7 +105,7 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
                     embeddings, classifier_logits = model(imgs)
                     indices_tuple = mining_func(embeddings, labels_ids)
                     loss_triplet = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
-                    model_compatible_labels = torch.Tensor([model.families_to_id_mapping[family] for family in families]).long().to(device)
+                    model_compatible_labels = torch.Tensor([actual_model.families_to_id_mapping[family] for family in families]).long().to(device)
                     loss_classification = criterion_classification(classifier_logits, model_compatible_labels)
                     loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
                     loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
