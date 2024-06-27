@@ -66,16 +66,16 @@ def infer_batch(images, months, days, model, device, use_mixed_precision):
         if len(data.shape) == 3:
             data = data.unsqueeze(0)
 
-        with ConditionalAutocast(use_mixed_precision):
-            if isinstance(model, XPrizeTreeEmbedder2NoDate):
-                output = model(data)
-            else:
-                output = model(data, months, days)
-
         if isinstance(model, nn.DataParallel):
             actual_model = model.module
         else:
             actual_model = model
+
+        with ConditionalAutocast(use_mixed_precision):
+            if isinstance(actual_model, XPrizeTreeEmbedder2NoDate):
+                output = model(data)
+            else:
+                output = model(data, months, days)
 
         if isinstance(actual_model, XPrizeTreeEmbedder):
             embeddings = output
@@ -83,7 +83,7 @@ def infer_batch(images, months, days, model, device, use_mixed_precision):
         elif isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
             embeddings, classifier_logits = output[0], output[1]
             predicted_families_ids = torch.argmax(classifier_logits, dim=1)
-            predicted_families = [model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
+            predicted_families = [actual_model.ids_to_families_mapping[int(family_id)] for family_id in predicted_families_ids]
         else:
             raise ValueError(f'Unknown model type: {actual_model.__class__}')
 
