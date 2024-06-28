@@ -30,6 +30,27 @@ import torch
 import torch.optim as optim
 
 
+class BioCLIPModel:
+    def __init__(self, model_name, pretrained_path, device=None):
+        self.device = device if device else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model, self.preprocess_train, self.preprocess_val = self._load_model(model_name, pretrained_path)
+
+    def _load_model(self, model_name, pretrained_path):
+        model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
+            model_name=model_name,
+            pretrained=pretrained_path
+        )
+        return model.to(self.device), preprocess_train, preprocess_val
+
+    def generate_embeddings(self, image_tensors):
+        """Generate embeddings for the preprocessed images."""
+        with torch.no_grad(), torch.cuda.amp.autocast():
+            embeddings = [self.model.encode_image(image_tensor.to(self.device)) for image_tensor in image_tensors]
+            return np.stack(embeddings, axis=0).squeeze()
+
+
+
+
 class SimpleNN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(SimpleNN, self).__init__()
@@ -240,22 +261,32 @@ def train_downstream_model_nn(
     Y_train = Y_train.to(device)
     X_test = X_test.to(device)
 
+    best_model = model
+    best_acc = 0
     # Training loop
     for epoch in range(config['num_epochs']):
         model.train()
         optimizer.zero_grad()
         outputs = model(X_train)
         loss = criterion(outputs, Y_train)
-        print (epoch, loss)
         loss.backward()
         optimizer.step()
+        if epoch % 5 == 0:
+            # Evaluate the model
+            model.eval()
+            with torch.no_grad():
+                y_pred_nn = model(X_test)
+                y_pred_nn = torch.argmax(y_pred_nn, axis=1).cpu().numpy()
+                overall_accuracy = accuracy_score(Y_test.cpu().numpy(), y_pred_nn)
+                print (f'epoch {epoch}: {overall_accuracy} accuracy')
+                if overall_accuracy >= best_acc:
+                    best_model = model
+                    best_acc = overall_accuracy
 
-    # Evaluate the model
-    model.eval()
+    best_model.eval()
     with torch.no_grad():
-        y_pred_nn = model(X_test)
+        y_pred_nn = best_model(X_test)
         y_pred_nn = torch.argmax(y_pred_nn, axis=1).cpu().numpy()
-
     # Confusion matrix
     cm_nn = confusion_matrix(Y_test.cpu().numpy(), y_pred_nn)
     class_names = np.unique(Y_test.cpu().numpy())
@@ -286,8 +317,8 @@ if __name__ == "__main__":
     config = {
         'test_size': 0.2,
         'random_state': 42,
-        'hidden_dim': 100,
-        'num_epochs': 100,
+        'hidden_dim': 512,
+        'num_epochs': 400,
         'learning_rate': 0.001,
         'loss': nn.CrossEntropyLoss()
 
