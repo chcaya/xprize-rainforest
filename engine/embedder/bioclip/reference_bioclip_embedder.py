@@ -1,3 +1,4 @@
+# this is an outdated script which is not yet deprecated as it is useful for reference purposes
 import glob
 import os
 
@@ -365,7 +366,6 @@ if __name__ == "__main__":
 
     # Concatenate all embeddings for t-SNE
     all_embeddings = np.vstack(all_embeddings)
-    # todo: save embeddings for lazy loading
 
     # visualize T-SNE of BioCLIP embeddings to see presence of clusters
     if make_plot:
@@ -380,5 +380,3 @@ if __name__ == "__main__":
     X_train, X_test, Y_train, Y_test, label_encoder = preprocess_data(all_embeddings, labels, test_size=config['test_size'], random_state=42)
     model_svc, classification_report_svc = train_downstream_model(X_train, X_test, Y_train, Y_test, classifier=svc, label_encoder=label_encoder)
     model_nn, acc_nn, classification_report_nn = train_downstream_model_nn(X_train, X_test, Y_train, Y_test, config=config, label_encoder=label_encoder)
-
-    #todo: package embedder and trained classifier into one object

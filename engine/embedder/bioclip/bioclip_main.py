@@ -28,21 +28,22 @@ if __name__ == "__main__":
     brazil_photos_taxonomy_path = dir_path / 'photos_exif_taxo.csv'
     folder_glob_search_str = dir_path / "dji/zoomed_out/cropped/*"
     folders = glob.glob(str(folder_glob_search_str))
+
     brazil_photos_taxonomy = pd.read_csv(brazil_photos_taxonomy_path)
-    filename_and_key = brazil_photos_taxonomy[['fileName', 'familyKey', 'genusKey', 'speciesKey']]
     all_embeddings, labels, markers = [], [], []
 
-    for idx, folder in enumerate(folders):
+    for idx, folder in enumerate(folders[:40]):
         image_paths = glob.glob(str(Path(folder) / '*'))
         filenames = [os.path.basename(image_path) for image_path in image_paths]
         taxon_keys = {
-            key: [get_taxon_key_from_df(filename, filename_and_key, key=key)
+            key: [get_taxon_key_from_df(filename, brazil_photos_taxonomy, key=key)
                   for filename in filenames]
             for key in ['speciesKey', 'genusKey', 'familyKey']
         }
-        preprocessed_images_train = [bioclip_model.preprocess_train(Image.open(image).convert("RGB")).unsqueeze(0) for image in image_paths]
-        embeddings_train = bioclip_model.generate_embeddings(preprocessed_images_train)
-        all_embeddings.append(embeddings_train)
+        # todo: double check preprocessing, add augmentation to train
+        preprocessed_images_ = [bioclip_model.preprocess_val(Image.open(image).convert("RGB")).unsqueeze(0) for image in image_paths]
+        embeddings = bioclip_model.generate_embeddings(preprocessed_images_)
+        all_embeddings.append(embeddings)
         labels += [f"{family}_{genus}" for family, genus in zip(taxon_keys['familyKey'], taxon_keys['genusKey'])]
         markers += ['o'] * len(taxon_keys['familyKey'])
 
@@ -57,12 +58,11 @@ if __name__ == "__main__":
 
 
 
-    X_train, X_test, y_train, y_test, label_encoder = trainer.preprocess_data(all_embeddings, labels, test_size=config['test_size'], random_state=config['random_state'])
+    X_train, X_test, y_train, y_test, label_encoder = trainer.preprocess_data(all_embeddings, labels,
+                                                                              test_size=config['test_size'],
+                                                                              random_state=config['random_state'])
 
-    #
-    # preprocessed_images_test = [bioclip_model.preprocess_val(Image.open(image).convert("RGB")).unsqueeze(0) for image in X_test]
-    # embeddings_test = bioclip_model.generate_embeddings(preprocessed_images_test)
-
+    # model_knn, classifier_preds_knn, knn_accuracy, knn_report, cm_knn = trainer.train_knn(X_train, X_test, y_train, y_test)
     model_svc, classifier_preds, svc_accuracy, svc_report, cm_svc = trainer.train_svc(X_train, X_test, y_train, y_test)
     model_nn, nn_preds, nn_accuracy, nn_report, cm_nn = trainer.train_nn(X_train, X_test, y_train, y_test)
 
