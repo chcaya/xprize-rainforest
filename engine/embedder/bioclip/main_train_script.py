@@ -8,7 +8,7 @@ import numpy as np
 from bioclip_model import BioCLIPModel
 from downstream_trainer import DownstreamModelTrainer
 from utils.data_utils import get_taxon_key_from_df
-from utils.visualization import plot_confusion_matrix, plot_embeddings
+from utils.visualization import plot_embeddings
 
 import yaml
 
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     filename_and_key = brazil_photos_taxonomy[['fileName', 'familyKey', 'genusKey', 'speciesKey']]
     all_embeddings, labels, markers = [], [], []
 
-    for idx, folder in enumerate(folders[:20]):
+    for idx, folder in enumerate(folders):
         image_paths = glob.glob(str(Path(folder) / '*'))
         filenames = [os.path.basename(image_path) for image_path in image_paths]
         taxon_keys = {
@@ -48,8 +48,7 @@ if __name__ == "__main__":
 
     all_embeddings = np.vstack(all_embeddings)
 
-    # Visualize embeddings if flag is set
-    visualize_embeddings = True  # Set this flag as needed
+    visualize_embeddings = False
     if visualize_embeddings:
         plot_embeddings(all_embeddings, labels, markers)
 
