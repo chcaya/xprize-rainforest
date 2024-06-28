@@ -32,7 +32,7 @@ if __name__ == "__main__":
     brazil_photos_taxonomy = pd.read_csv(brazil_photos_taxonomy_path)
     all_embeddings, labels, markers = [], [], []
 
-    for idx, folder in enumerate(folders[:40]):
+    for idx, folder in enumerate(folders):
         image_paths = glob.glob(str(Path(folder) / '*'))
         filenames = [os.path.basename(image_path) for image_path in image_paths]
         taxon_keys = {
