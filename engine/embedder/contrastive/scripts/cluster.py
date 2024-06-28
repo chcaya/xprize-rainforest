@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+import umap
 
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
@@ -17,12 +18,12 @@ from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FORE
 
 if __name__ == "__main__":
     source_data_root = Path('/home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03')
-    min_level = 'genus'
+    min_level = 'family'
     n_clusters = 15  # Adjust this value based on your needs
     phylogenetic_tree_distances_path = '/home/hugo/Documents/xprize/data/pairs_with_dist.csv'
     metric = 'cosine' #'euclidean'
     # checkpoint = '/home/hugo/Documents/xprize/trainings/contrastive_resnet50_256_1024_144_mpt_1719085279/checkpoint_7.pth'
-    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719430612/checkpoint_10.pth'
+    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719470300/checkpoint_37_62700.pth'
     # checkpoint = '/home/hugo/Documents/xprize/training_alliance_canada/min_family/checkpoint_29.pth'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     image_size = 768
@@ -40,18 +41,17 @@ if __name__ == "__main__":
     panama_date_pattern = r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})|bci_50ha_(?P<year2>\d{4})_(?P<month2>\d{2})_(?P<day2>\d{2})_'
     quebec_date_pattern = r'^(?P<year>\d{4})_(?P<month>\d{2})_(?P<day>\d{2})_'
 
+    # test data
     test_dataset_panama = ContrastiveInternalDataset(
         fold='test',
         root_path=source_data_root / 'panama',
         date_pattern=panama_date_pattern
     )
-
     test_dataset_quebec = ContrastiveInternalDataset(
         fold='test',
         root_path=source_data_root / 'quebec_trees',
         date_pattern=quebec_date_pattern
     )
-
     test_dataset_brazil = ContrastiveInternalDataset(
         fold='test',
         root_path=source_data_root / 'brazil_zf2',
@@ -63,12 +63,26 @@ if __name__ == "__main__":
         date_pattern=equator_date_pattern
     )
 
+    # valid data
+    test_dataset_brazil_valid = ContrastiveInternalDataset(
+        fold='valid',
+        root_path=source_data_root / 'brazil_zf2',
+        date_pattern=brazil_date_pattern
+    )
+    test_dataset_equator_valid = ContrastiveInternalDataset(
+        fold='valid',
+        root_path=source_data_root / 'equator',
+        date_pattern=equator_date_pattern
+    )
+
     dataset = ContrastiveDataset(
         dataset_config={
                         # 'brazil': test_dataset_brazil,
-                        # 'equator': test_dataset_equator,
+                        'equator': test_dataset_equator,
                         # 'panama': test_dataset_panama,
-                        'quebec': test_dataset_quebec
+                        # 'quebec': test_dataset_quebec,
+                        # 'brazil_valid': test_dataset_brazil_valid,
+                        'equator_valid': test_dataset_equator_valid,
         },
         min_level=min_level,
         image_size=image_size,
@@ -76,7 +90,8 @@ if __name__ == "__main__":
         normalize=True,
         mean=FOREST_QPEB_MEAN,
         std=FOREST_QPEB_STD,
-        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path)
+        taxa_distances_df=pd.read_csv(phylogenetic_tree_distances_path),
+        max_resampling_times=0
     )
 
     with torch.no_grad():
@@ -87,7 +102,7 @@ if __name__ == "__main__":
     embeddings_np = embeddings.cpu().numpy() if isinstance(embeddings, torch.Tensor) else np.array(embeddings)
 
     df = pd.DataFrame({'embeddings': list(embeddings_np), 'labels': labels, 'family': families})
-    df.to_csv('./embeddings_quebec.csv', index=False)
+    df.to_csv('./embeddings_random.csv', index=False)
 
     # # Apply K-Means clustering
     # kmeans = KMeans(n_clusters=n_clusters, random_state=42)
@@ -97,6 +112,11 @@ if __name__ == "__main__":
     tsne = TSNE(n_components=2, random_state=42, metric=metric)
     reduced_embeddings = tsne.fit_transform(embeddings_np)
     top_labels = list(set(labels))
+
+    # # Compute UMAP
+    # reducer = umap.UMAP(n_components=2, random_state=42)
+    # reduced_embeddings = reducer.fit_transform(embeddings_np)
+    # top_labels = list(set(labels))
 
     plt.figure(figsize=(27, 12))
     # eps_list = [0.03, 0.05, 0.08, 0.12, 0.15, 0.2]

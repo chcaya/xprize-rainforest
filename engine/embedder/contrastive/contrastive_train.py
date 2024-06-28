@@ -48,7 +48,7 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
           num_epochs: int,
           valid_knn_k: int):
 
-    if use_multi_gpu and torch.cuda.device_count() > 1:
+    if use_multi_gpu:
         model = nn.DataParallel(model)
     model.to(device)
 
