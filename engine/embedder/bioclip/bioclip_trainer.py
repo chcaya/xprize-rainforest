@@ -42,28 +42,26 @@ def main(config_path, visualize_embeddings, num_folders, downstream):
     dataset = BioClipDataset(image_paths, taxonomy_data, bioclip_model.preprocess_val)
     data_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True, num_workers=4)
 
-    all_embeddings, labels_list = [], []
+    all_embeddings, all_labels = [], []
     for images, labels in data_loader:
         embeddings = bioclip_model.generate_embeddings(images)
         all_embeddings.append(embeddings)
-        labels_list.extend(labels)
+        all_labels.extend(labels)
 
     all_embeddings = torch.cat(all_embeddings)
-    labels = torch.tensor(labels_list)
 
     if visualize_embeddings:
-        plot_embeddings(all_embeddings.numpy(), labels)
+        plot_embeddings(all_embeddings.numpy(), all_labels)
 
     X_train, X_test, y_train, y_test, label_encoder = trainer.preprocess_data(
-        all_embeddings.numpy(), labels.numpy(), test_size=config['test_size'], random_state=config['random_state'])
+        all_embeddings.numpy(), np.array(all_labels), test_size=config['test_size'], random_state=config['random_state'])
 
     if downstream == 'knn':
         model, classifier_preds, accuracy, report, cm = trainer.train_knn(X_train, X_test, y_train, y_test)
     elif downstream == 'svc':
         model, classifier_preds, accuracy, report, cm = trainer.train_svc(X_train, X_test, y_train, y_test)
     elif downstream == 'nn':
-        model, classifier_preds, accuracy, report, cm = trainer.train_nn(X_train, X_test, y_train, y_test,
-                                                                         save_path="models/best_nn_model.pth")
+        model, classifier_preds, accuracy, report, cm = trainer.train_nn(X_train, X_test, y_train, y_test)
     else:
         raise ValueError("Invalid downstream model type. Choose from 'knn', 'svc', or 'nn'.")
 
