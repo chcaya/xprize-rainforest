@@ -19,7 +19,7 @@ Modify the `config.yaml` file to set the required parameters for model training 
 You can run the entire pipeline using:
 
 ```bash
-python run_bioclip_trainer.py
+python bioclip_trainer.py
 ```
 
 ### Visualizing Embeddings
