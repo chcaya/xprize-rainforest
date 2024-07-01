@@ -17,3 +17,10 @@ data:
   taxonomy_file: 'photos_exif_taxo.csv'
   folder_pattern: 'dji/zoomed_out/cropped/*'
   num_folders: 20  # Set to a number to limit the number of folders
+
+active_learner:
+  sample_dbscan_points_per_cluster: 10
+  sample_size: 20
+  max_iterations: 20
+  visualize_clusters: False
+  visualize_dbscan: True
