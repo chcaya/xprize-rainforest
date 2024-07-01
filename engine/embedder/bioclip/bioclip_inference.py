@@ -9,6 +9,7 @@ from engine.embedder.bioclip.bioclip_model import BioCLIPModel
 from engine.embedder.bioclip.downstream_trainer import DownstreamModelTrainer
 from engine.embedder.bioclip.data_init import data_loader_init_main
 
+
 class BioClipInference:
     SUPPORTED_MODELS = ['knn', 'svc', 'nn']
 
@@ -44,7 +45,7 @@ class BioClipInference:
         model.load_state_dict(torch.load(model_path, map_location=self.device))
         return model
 
-    def save_predictions(self, file_paths, predictions, output_file = None):
+    def save_predictions(self, file_paths, predictions, output_file=None):
         df = pd.DataFrame({
             'file_path': file_paths,
             'prediction': predictions
@@ -85,12 +86,14 @@ class BioClipInference:
         predictions_df = self.save_predictions(file_paths, predictions, output_file)
         return predictions_df
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BioCLIP Model Inference")
     parser.add_argument('--config', type=str, default='config.yaml', help='Path to the configuration file')
     parser.add_argument('--model', type=str, required=True, help='Path to the saved downstream model state dict')
     parser.add_argument('--data_dir', type=str, required=True, help='Directory containing the data for inference')
-    parser.add_argument('--model_type', type=str, choices=['knn', 'svc', 'nn'], required=True, help='Type of downstream model to load')
+    parser.add_argument('--model_type', type=str, choices=['knn', 'svc', 'nn'], required=True,
+                        help='Type of downstream model to load')
     parser.add_argument('--save_predictions', action='store_true', help='Flag to save predictions to a file')
     parser.add_argument('--output_file', type=str, help='File path to save predictions')
 
