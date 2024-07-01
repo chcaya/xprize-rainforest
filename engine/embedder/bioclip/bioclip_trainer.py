@@ -8,14 +8,11 @@ from torch.utils.data import DataLoader
 from bioclip_model import BioCLIPModel
 from downstream_trainer import DownstreamModelTrainer
 from dataset import BioClipDataset
-from file_loader import FileLoader
+from file_loader import BioClipFileLoader
 from utils.visualization import plot_embeddings
+from utils.config_utils import load_config
+from engine.embedder.bioclip.data_init import data_loader_init_main
 
-
-def load_config(config_path):
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    return config
 
 
 def main(config_path, visualize_embeddings, num_folders, downstream):
@@ -23,24 +20,8 @@ def main(config_path, visualize_embeddings, num_folders, downstream):
 
     bioclip_model = BioCLIPModel(config['model_name'], config['pretrained_path'])
     trainer = DownstreamModelTrainer(config)
+    data_loader = data_loader_init_main('config.yaml')
 
-    file_loader = FileLoader(
-        dir_path=Path('/Users/daoud/PycharmAssets/xprize/'),
-        taxonomy_file='photos_exif_taxo.csv'
-    )
-
-    taxonomy_data = file_loader.get_taxonomy_data()
-
-    folders = file_loader.get_folders("dji/zoomed_out/cropped/*")
-    if num_folders is not None:
-        folders = folders[:num_folders]
-
-    image_paths = []
-    for folder in folders:
-        image_paths.extend(file_loader.get_image_paths(folder))
-
-    dataset = BioClipDataset(image_paths, taxonomy_data, bioclip_model.preprocess_val)
-    data_loader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=True, num_workers=4)
 
     all_embeddings, all_labels = [], []
     for images, labels in data_loader:

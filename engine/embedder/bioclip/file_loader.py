@@ -4,7 +4,7 @@ from typing import List
 
 import pandas as pd
 
-class FileLoader:
+class BioClipFileLoader:
     def __init__(self, dir_path: Path, taxonomy_file: str):
         self.dir_path = dir_path
         self.taxonomy_file = taxonomy_file

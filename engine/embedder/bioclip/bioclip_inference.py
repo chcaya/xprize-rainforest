@@ -7,7 +7,7 @@ import yaml
 import pandas as pd
 from torch.utils.data import DataLoader
 from dataset import BioClipDataset
-from file_loader import FileLoader
+from file_loader import BioClipFileLoader
 from bioclip_model import BioCLIPModel
 from downstream_trainer import DownstreamModelTrainer
 
@@ -47,7 +47,7 @@ class BioClipInference:
         return model
 
     def __call__(self, image_dir: str, save_predictions: bool = False, output_file: str = None):
-        file_loader = FileLoader(
+        file_loader = BioClipFileLoader(
             dir_path=Path(image_dir),
             taxonomy_file=self.config['taxonomy_file']
         )

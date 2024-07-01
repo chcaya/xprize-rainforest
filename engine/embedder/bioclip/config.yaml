@@ -1,11 +1,19 @@
-model_name: "hf-hub:imageomics/bioclip"
-pretrained_path: "/Users/daoud/PycharmAssets/xprize/open_clip_pytorch_model.bin" # "default/path/to/pretrained/model"
-test_size: 0.3
-random_state: 42
-batch_size: 12
-hidden_dim: 1024
-num_epochs: 400
-learning_rate: 0.001
-loss: cross_entropy
-n_neighbors: 10
-kernel: linear
+training:
+  model_name: "hf-hub:imageomics/bioclip"
+  pretrained_path: "/Users/daoud/PycharmAssets/xprize/open_clip_pytorch_model.bin" # "default/path/to/pretrained/model"
+  test_size: 0.3
+  random_state: 42
+  batch_size: 12
+  hidden_dim: 1024
+  num_epochs: 400
+  learning_rate: 0.001
+  loss: cross_entropy
+  n_neighbors: 10
+  kernel: linear
+  num_workers: 4
+
+data:
+  dir_path: '/Users/daoud/PycharmAssets/xprize/'
+  taxonomy_file: 'photos_exif_taxo.csv'
+  folder_pattern: 'dji/zoomed_out/cropped/*'
+  num_folders: 20  # Set to a number to limit the number of folders

@@ -34,3 +34,5 @@ class BioClipDataset(Dataset):
         genus_key = self.get_taxon_key_from_df(Path(image_path).name, key='genusKey')
         label = f'{family_key}_{genus_key}'
         return image, label
+
+
