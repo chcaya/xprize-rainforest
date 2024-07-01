@@ -1,15 +1,13 @@
 # this file is a WIP
 
 import argparse
-from pathlib import Path
 import torch
 import yaml
 import pandas as pd
-from torch.utils.data import DataLoader
-from dataset import BioClipDataset
-from file_loader import BioClipFileLoader
-from bioclip_model import BioCLIPModel
-from downstream_trainer import DownstreamModelTrainer
+
+from engine.embedder.bioclip.bioclip_model import BioCLIPModel
+from engine.embedder.bioclip.downstream_trainer import DownstreamModelTrainer
+from engine.embedder.bioclip.data_init import data_loader_init_main
 
 class BioClipInference:
     SUPPORTED_MODELS = ['knn', 'svc', 'nn']
@@ -32,7 +30,7 @@ class BioClipInference:
     def _load_downstream_model(self, model_path: str):
         assert self.model_type in self.SUPPORTED_MODELS, \
             f"Invalid downstream model type: '{self.model_type}'. Valid values are {self.SUPPORTED_MODELS}."
-        #todo: simplify model loading
+
         trainer = DownstreamModelTrainer(self.config)
         if self.model_type == 'knn':
             raise NotImplementedError
@@ -46,32 +44,35 @@ class BioClipInference:
         model.load_state_dict(torch.load(model_path, map_location=self.device))
         return model
 
+    def save_predictions(self, file_paths, predictions, output_file = None):
+        df = pd.DataFrame({
+            'file_path': file_paths,
+            'prediction': predictions
+        })
+
+        if output_file:
+            df.to_csv(output_file, index=False)
+            print(f"Predictions saved to {output_file}")
+
+        print(f"Inference completed. Predictions: {predictions}")
+        return df
+
     def __call__(self, image_dir: str, save_predictions: bool = False, output_file: str = None):
-        file_loader = BioClipFileLoader(
-            dir_path=Path(image_dir),
-            taxonomy_file=self.config['taxonomy_file']
-        )
 
-        taxonomy_data = file_loader.get_taxonomy_data()
-        # todo: move this to config or argparse
-        folders = file_loader.get_folders("dji/zoomed_out/cropped/*")
-
-        image_paths = []
-        for folder in folders:
-            image_paths.extend(file_loader.get_image_paths(folder))
-
-        dataset = BioClipDataset(image_paths, taxonomy_data, self.bioclip_model.preprocess_val)
-        data_loader = DataLoader(dataset, batch_size=self.config['batch_size'], shuffle=False, num_workers=4)
+        data_loader = data_loader_init_main('config.yaml')
 
         all_embeddings, file_paths = [], []
+
+        # todo: for inference loader file path needs to be sent
         for images, labels in data_loader:
             images = images.to(self.device)
             embeddings = self.bioclip_model.generate_embeddings(images)
             all_embeddings.append(embeddings)
-            file_paths.extend(dataset.image_paths)
 
         all_embeddings = torch.cat(all_embeddings).cpu()
 
+        # predict on downstream
+        # todo: give confidence score from logits
         if self.model_type == 'nn':
             self.downstream_model.eval()
             with torch.no_grad():
@@ -81,18 +82,8 @@ class BioClipInference:
             predictions = self.downstream_model.predict(all_embeddings)
 
         predictions = predictions.cpu().numpy()
-
-        df = pd.DataFrame({
-            'file_path': file_paths,
-            'prediction': predictions
-        })
-
-        if save_predictions and output_file:
-            df.to_csv(output_file, index=False)
-            print(f"Predictions saved to {output_file}")
-
-        print(f"Inference completed. Predictions: {predictions}")
-        return df
+        predictions_df = self.save_predictions(file_paths, predictions, output_file)
+        return predictions_df
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BioCLIP Model Inference")
