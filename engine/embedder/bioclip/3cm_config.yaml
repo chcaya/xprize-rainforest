@@ -15,8 +15,8 @@ training:
 data:
   dir_path: '/Users/daoud/PycharmAssets/xprize/'
   taxonomy_file: 'photos_exif_taxo.csv'
-  folder_pattern: 'dji/zoomed_out/cropped/*'
-  num_folders: 20  # Set to a number to limit the number of folders
+  folder_pattern: 'dji/3cm/cropped_3cm/*'
+  num_folders: 4  # Set to a number to limit the number of folders
 
 active_learner:
   sample_dbscan_points_per_cluster: 10

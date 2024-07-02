@@ -7,6 +7,8 @@ Please download model weights from the drive link below:
 
 `link/to/drive`
 
+Official Link:
+https://huggingface.co/imageomics/bioclip/blob/main/open_clip_pytorch_model.bin
 
 ## Usage
 
