@@ -2,6 +2,7 @@ io:
     raster_path: ''
     segmentations_geopackage_path: ''
     output_folder: ''
+    day_month_year: null #['01', '01', '2021']
 
 pipeline_classifier:
     tilerizer:
@@ -26,16 +27,18 @@ pipeline_classifier:
     embedder:
         infer:
             batch_size: 16
-            siamese:
-                checkpoint_path: 'models/siamese_classifier/checkpoint_0_20000.pth'
-                architecture:
-                    architecture_name: 'siamese'
-                    backbone_model_resnet_name: 'resnet50'
-                    final_embedding_size: 1024
-
-    classifier:
-        infer:
-            scaler_checkpoint_path: 'models/siamese_classifier/scaler.joblib'
-            classifier_checkpoint_path: 'models/siamese_classifier/svc.joblib'
-            architecture:
-                architecture_name: 'svm'
+#            siamese:
+#                checkpoint_path: 'models/siamese_classifier/checkpoint_0_20000.pth'
+#                architecture:
+#                    architecture_name: 'siamese'
+#                    backbone_model_resnet_name: 'resnet50'
+#                    final_embedding_size: 1024
+#                classifier:
+#                    infer:
+#                        scaler_checkpoint_path: 'models/siamese_classifier/scaler.joblib'
+#                        classifier_checkpoint_path: 'models/siamese_classifier/svc.joblib'
+#                        architecture:
+#                            architecture_name: 'svm'
+            contrastive:
+                checkpoint_path: 'models/contrastive_classifier/checkpoint_0_20000.pth'
+                mean_std_descriptor: 'forest_qpeb'

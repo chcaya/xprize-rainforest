@@ -1,12 +1,13 @@
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import albumentations
 import numpy as np
 import pandas as pd
 import rasterio
 from geodataset.dataset.base_dataset import BaseLabeledCocoDataset
+from geodataset.utils import rle_segmentation_to_mask, mask_to_polygon
 
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, scale_values, normalize
 
@@ -15,26 +16,37 @@ class BaseContrastiveLabeledCocoDataset(BaseLabeledCocoDataset):
     def __init__(self,
                  fold: str,
                  root_path: Path or List[Path],
-                 date_pattern: str,
+                 date_pattern: str or None,
+                 day_month_year: Tuple[int, int, int] = None,
                  transform: albumentations.core.composition.Compose = None):
         super().__init__(fold=fold, root_path=root_path, transform=transform)
 
         self.date_pattern = date_pattern
+        self.day_month_year = day_month_year
+
+        assert not (self.date_pattern is None and self.day_month_year is None), \
+            "Either date_pattern or day_month_year should be provided."
+
         self._get_dates()
 
     def _get_dates(self):
         for idx in self.tiles:
-            date_match = re.match(self.date_pattern, self.tiles[idx]['name'])
-            if date_match.group('year'):
-                self.tiles[idx]['year'] = int(date_match.group('year'))
-                self.tiles[idx]['month'] = int(date_match.group('month'))
-                self.tiles[idx]['day'] = int(date_match.group('day'))
-            elif date_match.group('year2'):
-                self.tiles[idx]['year'] = int(date_match.group('year2'))
-                self.tiles[idx]['month'] = int(date_match.group('month2'))
-                self.tiles[idx]['day'] = int(date_match.group('day2'))
+            if self.day_month_year:
+                self.tiles[idx]['year'] = self.day_month_year[2]
+                self.tiles[idx]['month'] = self.day_month_year[1]
+                self.tiles[idx]['day'] = self.day_month_year[0]
             else:
-                raise ValueError(f"Could not find date in tile name: {self.tiles[idx]['name']}.")
+                date_match = re.match(self.date_pattern, self.tiles[idx]['name'])
+                if date_match.group('year'):
+                    self.tiles[idx]['year'] = int(date_match.group('year'))
+                    self.tiles[idx]['month'] = int(date_match.group('month'))
+                    self.tiles[idx]['day'] = int(date_match.group('day'))
+                elif date_match.group('year2'):
+                    self.tiles[idx]['year'] = int(date_match.group('year2'))
+                    self.tiles[idx]['month'] = int(date_match.group('month2'))
+                    self.tiles[idx]['day'] = int(date_match.group('day2'))
+                else:
+                    raise ValueError(f"Could not find date in tile name: {self.tiles[idx]['name']}.")
 
     def __getitem__(self, idx: int):
         pass
@@ -47,8 +59,9 @@ class ContrastiveInternalDataset(BaseContrastiveLabeledCocoDataset):
     def __init__(self,
                  fold: str,
                  root_path: Path or List[Path],
-                 date_pattern: str):
-        super().__init__(fold=fold, root_path=root_path, date_pattern=date_pattern, transform=None)
+                 date_pattern: str or None,
+                 day_month_year: Tuple[int, int, int] = None):
+        super().__init__(fold=fold, root_path=root_path, date_pattern=date_pattern, day_month_year=day_month_year, transform=None)
 
         self.tiles_per_category_id = self._generate_tiles_per_class()
 
@@ -307,10 +320,12 @@ class ContrastiveDataset:
 
 class ContrastiveInferDataset(BaseContrastiveLabeledCocoDataset):
     def __init__(self, image_size: int, transform: albumentations.core.composition.Compose,
-                 fold: str, root_path: Path or List[Path], date_pattern: str, normalize: bool = True,
+                 fold: str, root_path: Path or List[Path], date_pattern: str or None,
+                 day_month_year: Tuple[int, int, int] = None, normalize: bool = True,
                  mean: np.array = FOREST_QPEB_MEAN, std: np.array = FOREST_QPEB_STD):
 
-        super().__init__(fold=fold, root_path=root_path, date_pattern=date_pattern, transform=transform)
+        super().__init__(fold=fold, root_path=root_path, date_pattern=date_pattern,
+                         day_month_year=day_month_year, transform=transform)
         self.image_size = image_size
         self.transform = transform
         self.normalize = normalize

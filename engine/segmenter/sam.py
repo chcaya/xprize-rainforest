@@ -7,12 +7,13 @@ import torch
 from geodataset.dataset import DetectionLabeledRasterCocoDataset
 import multiprocessing
 
+from geodataset.utils import mask_to_polygon
 from segment_anything import SamPredictor, sam_model_registry
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from engine.segmenter.utils import mask_to_polygon, sam_collate_fn
+from engine.segmenter.utils import sam_collate_fn
 
 
 def get_memory_usage():
@@ -22,7 +23,7 @@ def get_memory_usage():
     return memory_percentage
 
 
-def process_masks(queue, output_dict, simplify_tolerance):
+def process_masks(queue, output_dict, simplify_tolerance, processed_counter):
     results = []
     while True:
         item = queue.get()
@@ -31,7 +32,10 @@ def process_masks(queue, output_dict, simplify_tolerance):
         tile_idx, masks, scores = item
         masks_polygons = [mask_to_polygon(mask.squeeze(), simplify_tolerance=simplify_tolerance) for mask in masks]
         results.append((tile_idx, masks_polygons, scores.squeeze().tolist()))
+        masks = None  # releasing memory?
         queue.task_done()  # Indicate that the task is complete
+        with processed_counter.get_lock():
+            processed_counter.value += 1
 
     for result in results:
         output_dict[result[0]] = (result[1], result[2])
@@ -64,14 +68,15 @@ class SamPredictorWrapper:
 
         for i in range(0, len(box_tensor), self.box_batch_size):
             box_batch = box_tensor[i:i + self.box_batch_size].to(self.device)
-            masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
-                                                                        point_labels=None,
-                                                                        boxes=box_batch,
-                                                                        multimask_output=False)
-            masks, scores = masks.cpu(), scores.cpu()
+            with torch.no_grad():
+                masks, scores, low_res_masks = self.predictor.predict_torch(point_coords=None,
+                                                                            point_labels=None,
+                                                                            boxes=box_batch,
+                                                                            multimask_output=False)
+                masks, scores = masks.cpu(), scores.cpu()
 
-            all_masks.append(masks)
-            all_scores.append(scores)
+                all_masks.append(masks)
+                all_scores.append(scores)
 
         all_masks = torch.cat(all_masks, dim=0)
         all_scores = torch.cat(all_scores, dim=0)
@@ -95,18 +100,20 @@ class SamPredictorWrapper:
         # Create a manager to share data across processes
         manager = multiprocessing.Manager()
         output_dict = manager.dict()
+        processed_counter = multiprocessing.Value('i', 0)
 
         # Start post-processing processes
         post_process_processes = []
         for _ in range(self.n_postprocess_workers):
-            p = multiprocessing.Process(target=process_masks, args=(queue, output_dict, self.simplify_tolerance))
+            p = multiprocessing.Process(target=process_masks, args=(queue, output_dict, self.simplify_tolerance, processed_counter))
             p.start()
             post_process_processes.append(p)
 
+        items_put_in_queue = 0
         for tile_idx, sample in enumerate(dataset_with_progress):
             if get_memory_usage() > 90:
-                print("Memory usage is high. Pausing for 10 seconds...")
-                time.sleep(10)
+                print("Memory usage is high. Waiting for the already queued items to be processed...")
+                queue.join()
 
             image, boxes_data = sample
             image = image[:3, :, :]
@@ -119,6 +126,7 @@ class SamPredictorWrapper:
 
             # Put masks and scores into the queue for post-processing
             queue.put((tile_idx, masks, scores))
+            items_put_in_queue += 1
 
         # Wait for all tasks in the queue to be completed
         queue.join()

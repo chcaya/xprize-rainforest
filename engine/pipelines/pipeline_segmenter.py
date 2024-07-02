@@ -16,6 +16,7 @@ class PipelineSegmenter(BaseRasterPipeline):
     def __init__(self, pipeline_segmenter_config: PipelineSegmenterIOConfig):
         super().__init__(
             raster_path=pipeline_segmenter_config.raster_path,
+            aoi_geopackage_path=pipeline_segmenter_config.aoi_geopackage_path,
             output_folder=pipeline_segmenter_config.output_folder
         )
 
@@ -43,7 +44,7 @@ class PipelineSegmenter(BaseRasterPipeline):
         segmenter_tiles_path, segmenter_coco_paths = tilerizer_main(
             config=segmenter_tilerizer_config
         )
-        segmenter_coco_path = segmenter_coco_paths[list(self.config.segmenter_tilerizer_config.aois.keys())[0]]
+        segmenter_coco_path = segmenter_coco_paths[self.AOI_NAME]
 
         # Predicting tree instance segmentations
         segmenter_config = self._get_segmenter_infer_config(

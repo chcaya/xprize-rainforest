@@ -1,5 +1,6 @@
 import argparse
 import multiprocessing
+import os
 
 from config.config_parsers.aggregator_parsers import AggregatorIOConfig
 from config.config_parsers.coco_to_geopackage_parsers import CocoToGeopackageIOConfig
@@ -20,7 +21,8 @@ from mains.segmenter_mains import segmenter_infer_main, segmenter_score_main
 from mains.tilerizer_mains import tilerizer_main
 
 if __name__ == "__main__":
-    multiprocessing.set_start_method('spawn')
+    if os.name == 'posix':
+        multiprocessing.set_start_method('spawn')
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, help="The task to perform.")

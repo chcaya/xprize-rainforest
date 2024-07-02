@@ -177,7 +177,7 @@ def validate(model,
              writer,
              valid_knn_k):
 
-    train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model_with_labels(
+    train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families, _ = infer_model_with_labels(
         model, train_loader, device, use_mixed_precision=True,
         desc='Inferring train samples...')
     train_to_delete = train_labels == -1
@@ -197,7 +197,7 @@ def validate(model,
     total_classification_samples = 0
 
     for dataset_name, valid_dataloader in valid_dataloaders.items():
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_dataloader, device, use_mixed_precision=True, desc=f'Inferring valid samples for {dataset_name}...')
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families, _ = infer_model_with_labels(model, valid_dataloader, device, use_mixed_precision=True, desc=f'Inferring valid samples for {dataset_name}...')
         valid_to_delete = valid_labels == -1
         valid_embeddings = valid_embeddings[~valid_to_delete]
         valid_labels = valid_labels[~valid_to_delete]
@@ -285,8 +285,8 @@ def validate_for_classification(model,
 
     model.eval()
     with torch.no_grad():
-        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families = infer_model_with_labels(model, valid_train_loader_for_classification, device, use_mixed_precision=False, desc='Inferring train samples...')
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_valid_loader_for_classification, device, use_mixed_precision=False, desc='Inferring valid samples...')
+        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families, _ = infer_model_with_labels(model, valid_train_loader_for_classification, device, use_mixed_precision=False, desc='Inferring train samples...')
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families, _ = infer_model_with_labels(model, valid_valid_loader_for_classification, device, use_mixed_precision=False, desc='Inferring valid samples...')
 
         train_to_delete = train_labels == -1
         valid_to_delete = valid_labels == -1
@@ -362,7 +362,7 @@ def validate_for_loss(model,
 
     model.eval()
     with torch.no_grad():
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families = infer_model_with_labels(model, valid_loader, device, use_mixed_precision=False, as_numpy=False)
+        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families, _ = infer_model_with_labels(model, valid_loader, device, use_mixed_precision=False, as_numpy=False)
         total_loss = criterion_metric(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
 
         writer.add_scalar('Valid/Loss_Triplet', total_loss / triplets_tuples[0].shape[0], overall_step)

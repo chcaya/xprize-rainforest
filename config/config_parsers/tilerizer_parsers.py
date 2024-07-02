@@ -22,32 +22,28 @@ class RasterResolutionConfig(BaseIntermediateConfig):
 
 
 @dataclass
-class TilerizerConfig(BaseConfig):
+class TilerizerNoAoiConfig(BaseConfig):
     tile_type: str
     tile_size: int
+    use_variable_tile_size: bool
+    variable_tile_size_pixel_buffer: int or None
     tile_overlap: float
     raster_resolution_config: RasterResolutionConfig
-
-    aoi_config: str
-    aoi_type: str
-    aois: dict
 
     ignore_black_white_alpha_tiles_threshold: float
 
     @classmethod
     def from_dict(cls, config: dict):
         tilerizer_config = config['tilerizer']
-        aoi_config = tilerizer_config['area_of_interest']
         raster_resolution_config = RasterResolutionConfig.from_dict(tilerizer_config['raster_resolution'])
 
         return cls(
             tile_type=tilerizer_config['tile_type'],
             tile_size=tilerizer_config['tile_size'],
+            use_variable_tile_size=tilerizer_config['use_variable_tile_size'],
+            variable_tile_size_pixel_buffer=tilerizer_config['variable_tile_size_pixel_buffer'],
             tile_overlap=tilerizer_config['tile_overlap'],
             raster_resolution_config=raster_resolution_config,
-            aoi_config=aoi_config['aoi_config'],
-            aoi_type=aoi_config['aoi_type'],
-            aois=aoi_config['aois'],
             ignore_black_white_alpha_tiles_threshold=tilerizer_config['ignore_black_white_alpha_tiles_threshold']
         )
 
@@ -56,15 +52,41 @@ class TilerizerConfig(BaseConfig):
             'tilerizer': {
                 'tile_type': self.tile_type,
                 'tile_size': self.tile_size,
+                'use_variable_tile_size': self.use_variable_tile_size,
+                'variable_tile_size_pixel_buffer': self.variable_tile_size_pixel_buffer,
                 'tile_overlap': self.tile_overlap,
                 'raster_resolution_config': self.raster_resolution_config.to_structured_dict(),
-                'area_of_interest': {
-                    'aoi_config': self.aoi_config,
-                    'aoi_type': self.aoi_type,
-                    'aois': self.aois
-                },
                 'ignore_black_white_alpha_tiles_threshold': self.ignore_black_white_alpha_tiles_threshold,
             }
+        }
+
+        return config
+
+
+@dataclass
+class TilerizerConfig(TilerizerNoAoiConfig):
+    aoi_config: str or None
+    aoi_type: str or None
+    aois: dict or None
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        parent_config = TilerizerNoAoiConfig.from_dict(config)
+        aoi_config = config['tilerizer']['area_of_interest']
+
+        return cls(
+            **parent_config.as_dict(),
+            aoi_config=aoi_config['aoi_config'],
+            aoi_type=aoi_config['aoi_type'],
+            aois=aoi_config['aois'],
+        )
+
+    def to_structured_dict(self):
+        config = super().to_structured_dict()
+        config['tilerizer']['area_of_interest'] = {
+            'aoi_config': self.aoi_config,
+            'aoi_type': self.aoi_type,
+            'aois': self.aois
         }
 
         return config

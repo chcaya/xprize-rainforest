@@ -19,6 +19,7 @@ class PipelineDetector(BaseRasterPipeline):
     def __init__(self, pipeline_detector_config: PipelineDetectorIOConfig):
         super().__init__(
             raster_path=pipeline_detector_config.raster_path,
+            aoi_geopackage_path=pipeline_detector_config.aoi_geopackage_path,
             output_folder=pipeline_detector_config.output_folder
         )
 
@@ -104,7 +105,7 @@ class PipelineDetector(BaseRasterPipeline):
         detector_infer_config = DetectorInferIOConfig(
             **self.config.detector_infer_config.as_dict(),
             input_tiles_root=str(self.detector_tilerizer_output_folder),
-            infer_aoi_name=list(self.config.detector_tilerizer_config.aois.keys())[0],
+            infer_aoi_name=self.AOI_NAME,
             output_folder=output_folder,
             coco_n_workers=self.config.coco_n_workers
         )

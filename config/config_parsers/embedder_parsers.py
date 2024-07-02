@@ -125,6 +125,36 @@ class SiameseInferIOConfig(SiameseInferConfig, EmbedderInferIOConfig):
 
 
 @dataclass
+class ContrastiveInferConfig(EmbedderInferConfig):
+    checkpoint_path: str
+    mean_std_descriptor: str
+    image_size: int
+
+    @classmethod
+    def from_dict(cls, config: dict):
+        parent_config = EmbedderInferConfig.from_dict(config)
+        embedder_infer_config = config['embedder']['infer']
+        contrastive_config = embedder_infer_config['contrastive']
+
+        return cls(
+            **parent_config.as_dict(),
+            checkpoint_path=contrastive_config['checkpoint_path'],
+            mean_std_descriptor=contrastive_config['mean_std_descriptor'],
+            image_size=contrastive_config['image_size']
+        )
+
+    def to_structured_dict(self) -> dict:
+        config = super().to_structured_dict()
+        config['embedder']['infer']['contrastive'] = {
+            'checkpoint_path': self.checkpoint_path,
+            'mean_std_descriptor': self.mean_std_descriptor,
+            'image_size': self.image_size
+        }
+
+        return config
+
+
+@dataclass
 class DINOv2InferConfig(EmbedderInferConfig):
     size: str
 

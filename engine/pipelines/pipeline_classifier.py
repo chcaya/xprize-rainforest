@@ -1,6 +1,7 @@
 from pathlib import Path
 import time
 
+from engine.embedder.contrastive.contrastive_infer import contrastive_classifier_embedder_infer
 from engine.embedder.siamese.siamese_infer import siamese_classifier
 from engine.pipelines.pipeline_base import BaseRasterPipeline
 
@@ -14,6 +15,7 @@ class PipelineClassifier(BaseRasterPipeline):
     def __init__(self, pipeline_classifier_config: PipelineClassifierIOConfig):
         super().__init__(
             raster_path=pipeline_classifier_config.raster_path,
+            aoi_geopackage_path=pipeline_classifier_config.aoi_geopackage_path,
             output_folder=pipeline_classifier_config.output_folder
         )
 
@@ -41,31 +43,45 @@ class PipelineClassifier(BaseRasterPipeline):
             config=embedder_tilerizer_config
         )
 
-        # Getting embeddings of each objects
-        classifier_coco_path = siamese_classifier(
+        tiles_polygons_gdf_crs, tiles_polygons_gdf_crs_path = contrastive_classifier_embedder_infer(
             data_roots=[coco_paths['infer'].parent, embedder_tiles_path],
-            fold='infer',
-            siamese_checkpoint=self.config.classifier_embedder_config.checkpoint_path,
-            scaler_checkpoint=self.config.classifier_infer_config.scaler_checkpoint_path,
-            svc_checkpoint=self.config.classifier_infer_config.classifier_checkpoint_path,
+            fold=self.AOI_NAME,
+            day_month_year=self.config.day_month_year,
+            image_size=self.config.classifier_embedder_config.image_size,
+            mean_std_descriptor=self.config.classifier_embedder_config.mean_std_descriptor,
+            contrastive_checkpoint=self.config.classifier_embedder_config.checkpoint_path,
             batch_size=self.config.classifier_embedder_config.batch_size,
-            backbone_model_resnet_name=self.config.classifier_embedder_config.architecture_config.backbone_model_resnet_name,
-            final_embedding_size=self.config.classifier_embedder_config.architecture_config.final_embedding_size,
             product_name=self.raster_name,
             ground_resolution=self.config.classifier_tilerizer_config.raster_resolution_config.ground_resolution,
             scale_factor=self.config.classifier_tilerizer_config.raster_resolution_config.scale_factor,
-            output_path=self.classifier_output_folder
-        )
-        coco_to_geopackage_config = self._get_coco_to_geopackage_config(
-            input_tiles_root=embedder_tiles_path,
-            coco_path=classifier_coco_path,
             output_folder=self.classifier_output_folder
         )
-        tree_segments_classified_gdf, classifier_geopackage_path = coco_to_geopackage_main(
-            config=coco_to_geopackage_config
-        )
+
+        # # Getting embeddings of each objects
+        # classifier_coco_path = siamese_classifier(
+        #     data_roots=[coco_paths['infer'].parent, embedder_tiles_path],
+        #     fold='infer',
+        #     siamese_checkpoint=self.config.classifier_embedder_config.checkpoint_path,
+        #     scaler_checkpoint=self.config.classifier_infer_config.scaler_checkpoint_path,
+        #     svc_checkpoint=self.config.classifier_infer_config.classifier_checkpoint_path,
+        #     batch_size=self.config.classifier_embedder_config.batch_size,
+        #     backbone_model_resnet_name=self.config.classifier_embedder_config.architecture_config.backbone_model_resnet_name,
+        #     final_embedding_size=self.config.classifier_embedder_config.architecture_config.final_embedding_size,
+        #     product_name=self.raster_name,
+        #     ground_resolution=self.config.classifier_tilerizer_config.raster_resolution_config.ground_resolution,
+        #     scale_factor=self.config.classifier_tilerizer_config.raster_resolution_config.scale_factor,
+        #     output_path=self.classifier_output_folder
+        # )
+        # coco_to_geopackage_config = self._get_coco_to_geopackage_config(
+        #     input_tiles_root=embedder_tiles_path,
+        #     coco_path=classifier_coco_path,
+        #     output_folder=self.classifier_output_folder
+        # )
+        # tree_segments_classified_gdf, classifier_geopackage_path = coco_to_geopackage_main(
+        #     config=coco_to_geopackage_config
+        # )
 
         end_time = time.time()
-        print(f"It took {end_time - start_time} seconds to run the raster through the Classifier pipeline.")
+        print(f"It took {end_time - start_time} seconds to run the raster through the Embedder/Classifier pipeline.")
 
-        return classifier_geopackage_path
+        return tiles_polygons_gdf_crs, tiles_polygons_gdf_crs_path
