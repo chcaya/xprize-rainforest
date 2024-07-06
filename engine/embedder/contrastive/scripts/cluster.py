@@ -17,13 +17,16 @@ from engine.embedder.contrastive.contrastive_train import infer_model_with_label
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, contrastive_collate_fn
 
 if __name__ == "__main__":
-    source_data_root = Path('/home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03')
+    # source_data_root = Path('/home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03')
+    source_data_root = Path('D:/XPrize/Data/pre_processed/FINAL_polygon_dataset_1536px_gr0p03')
     min_level = 'family'
     n_clusters = 15  # Adjust this value based on your needs
-    phylogenetic_tree_distances_path = '/home/hugo/Documents/xprize/data/pairs_with_dist.csv'
+    # phylogenetic_tree_distances_path = '/home/hugo/Documents/xprize/data/pairs_with_dist.csv'
+    phylogenetic_tree_distances_path = 'D:/XPrize/Data/phylogeny/pairs_with_dist.csv'
     metric = 'cosine' #'euclidean'
     # checkpoint = '/home/hugo/Documents/xprize/trainings/contrastive_resnet50_256_1024_144_mpt_1719085279/checkpoint_7.pth'
-    checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719470300/checkpoint_37_62700.pth'
+    # checkpoint = '/home/hugo/Documents/xprize/trainings_2/contrastive_resnet50_768_1024_64_genus_1719470300/checkpoint_37_62700.pth'
+    checkpoint = 'D:/XPrize/models/embedder_quebec_equator_brazil/checkpoint_37_62700.pth'
     # checkpoint = '/home/hugo/Documents/xprize/training_alliance_canada/min_family/checkpoint_29.pth'
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     image_size = 768
@@ -96,7 +99,7 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         loader = torch.utils.data.DataLoader(dataset, batch_size=4, shuffle=False, num_workers=4, collate_fn=contrastive_collate_fn)
-        labels, labels_ids, families, families_ids, embeddings, predicted_families = infer_model_with_labels(model, loader, device,
+        labels, labels_ids, families, families_ids, embeddings, predicted_families, _ = infer_model_with_labels(model, loader, device,
                                                                                         use_mixed_precision=False)
 
     embeddings_np = embeddings.cpu().numpy() if isinstance(embeddings, torch.Tensor) else np.array(embeddings)
