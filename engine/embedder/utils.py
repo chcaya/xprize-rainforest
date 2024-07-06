@@ -5,6 +5,14 @@ import numpy as np
 from sklearn.decomposition import PCA
 
 
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
+IMAGENET_STD = np.array([0.229, 0.224, 0.225])
+
+# QPEB = Quebec Panama Equator Brazil
+FOREST_QPEB_MEAN = np.array([0.463, 0.537, 0.363])
+FOREST_QPEB_STD = np.array([0.207, 0.206, 0.162])
+
+
 def apply_pca_to_images(embeddings: np.ndarray, pca_model_path: str, n_patches: int, n_features: int):
     n, h, w, d = embeddings.shape
     embeddings_array_flat = embeddings.reshape(-1, embeddings.shape[-1])
