@@ -157,7 +157,8 @@ class ContrastiveInferConfig(EmbedderInferConfig):
 @dataclass
 class DINOv2InferConfig(EmbedderInferConfig):
     size: str
-
+    instance_segmentation: bool
+    mean_std_descriptor: str
     @classmethod
     def from_dict(cls, config: dict):
         parent_config = EmbedderInferConfig.from_dict(config)
@@ -167,12 +168,16 @@ class DINOv2InferConfig(EmbedderInferConfig):
         return cls(
             **parent_config.as_dict(),
             size=dino_v2_config['size'],
+            instance_segmentation=dino_v2_config['instance_segmentation'],
+            mean_std_descriptor=dino_v2_config['mean_std_descriptor']
         )
 
     def to_structured_dict(self):
         config = super().to_structured_dict()
         config['embedder']['infer']['dino_v2'] = {
-            'size': self.size
+            'size': self.size,
+            'instance_segmentation': self.instance_segmentation,
+            'mean_std_descriptor': self.mean_std_descriptor
         }
 
         return config
