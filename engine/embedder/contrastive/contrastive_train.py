@@ -23,13 +23,13 @@ from warmup_scheduler import GradualWarmupScheduler
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveInternalDataset, ContrastiveDataset
 from engine.embedder.contrastive.contrastive_infer import infer_model_with_labels
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
-    XPrizeTreeEmbedder2NoDate
+    XPrizeTreeEmbedder2NoDate, DinoV2Embedder
 from engine.embedder.contrastive.contrastive_utils import FOREST_QPEB_MEAN, FOREST_QPEB_STD, save_model, \
     contrastive_collate_fn
 from engine.embedder.transforms import embedder_transforms_v2, embedder_simple_transforms_v2
 
 
-def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder2NoDate,
+def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder2NoDate or DinoV2Embedder,
           train_dataloader: DataLoader,
           valid_train_dataloader: DataLoader,
           valid_dataloaders: dict[str, DataLoader],
@@ -112,6 +112,10 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
                     loss = loss_weight_triplet * loss_triplet + loss_weight_classification * loss_classification
                     loss_classification_since_last_log += loss_weight_classification * loss_classification.item()
                     loss_triplet_since_last_log += loss_weight_triplet * loss_triplet.item()
+                elif isinstance(actual_model, DinoV2Embedder):
+                    embeddings = model(imgs)
+                    indices_tuple = mining_func(embeddings, labels_ids)
+                    loss = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
                 else:
                     raise ValueError(f'Unknown model type: {actual_model.__class__}')
 
@@ -397,6 +401,7 @@ if __name__ == '__main__':
     n_grad_accumulation_steps = yaml_config['n_grad_accumulation_steps']
     valid_batch_size = train_batch_size * yaml_config['valid_batch_size_multiplier']
     image_size = yaml_config['image_size']
+    random_crop = yaml_config['random_crop']
     loss_weight_triplet = yaml_config['loss_weight_triplet']
     loss_weight_classification = yaml_config['loss_weight_classification']
     triplet_margin = yaml_config['triplet_margin']
@@ -455,6 +460,7 @@ if __name__ == '__main__':
         dataset_config=train_dataset_config,
         min_level=min_level,
         image_size=image_size,
+        random_crop=random_crop,
         transform=A.Compose(embedder_transforms_v2),
         normalize=True,
         mean=FOREST_QPEB_MEAN,
@@ -467,6 +473,7 @@ if __name__ == '__main__':
         dataset_config=train_dataset_config,
         min_level=min_level,
         image_size=image_size,
+        random_crop=random_crop,
         transform=A.Compose(embedder_simple_transforms_v2),
         normalize=True,
         mean=FOREST_QPEB_MEAN,
@@ -504,6 +511,7 @@ if __name__ == '__main__':
             dataset_config={'equator': valid_dataset_equator},
             min_level=min_level,
             image_size=image_size,
+            random_crop=False,
             transform=None,
             normalize=True,
             mean=FOREST_QPEB_MEAN,
@@ -522,6 +530,7 @@ if __name__ == '__main__':
             dataset_config={'panama': valid_dataset_panama},
             min_level=min_level,
             image_size=image_size,
+            random_crop=False,
             transform=None,
             normalize=True,
             mean=FOREST_QPEB_MEAN,
@@ -540,6 +549,7 @@ if __name__ == '__main__':
             dataset_config={'quebec': valid_dataset_quebec},
             min_level=min_level,
             image_size=image_size,
+            random_crop=False,
             transform=None,
             normalize=True,
             mean=FOREST_QPEB_MEAN,
@@ -559,11 +569,17 @@ if __name__ == '__main__':
     #     families=list(siamese_sampler_dataset_train.families_set),
     # ).to(device)
 
-    model = XPrizeTreeEmbedder2NoDate(
-        resnet_model=resnet_model,
+    # model = XPrizeTreeEmbedder2NoDate(
+    #     resnet_model=resnet_model,
+    #     final_embedding_size=final_embedding_size,
+    #     dropout=dropout,
+    #     families=list(siamese_sampler_dataset_train.families_set),
+    # ).to(device)
+
+    model = DinoV2Embedder(
+        size='small',
         final_embedding_size=final_embedding_size,
-        dropout=dropout,
-        families=list(siamese_sampler_dataset_train.families_set),
+        dropout=dropout
     ).to(device)
 
     if start_from_checkpoint:

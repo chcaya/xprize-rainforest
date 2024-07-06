@@ -4,6 +4,8 @@ import torch
 from torch import nn
 from torchvision import models
 
+from engine.embedder.dinov2.dinov2 import DINOv2Inference
+
 
 class XPrizeTreeEmbedder(nn.Module):
     def __init__(self,
@@ -208,3 +210,40 @@ class XPrizeTreeEmbedder2NoDate(nn.Module):
         model.load_state_dict(checkpoint['model_state_dict'])
         return model
 
+
+class DinoV2Embedder(nn.Module):
+    def __init__(self,
+                 size: str,
+                 final_embedding_size: int,
+                 dropout: float):
+        super(DinoV2Embedder, self).__init__()
+
+        self.final_embedding_size = final_embedding_size
+
+        self.dino = DINOv2Inference(
+            size=size,
+            normalize=False,    # done in the dataset
+            instance_segmentation=False,
+            mean_std_descriptor=None
+        )
+
+        for param in self.dino.model.parameters():
+            param.requires_grad = False
+
+        self.fc = nn.Sequential(
+            nn.Linear(self.dino.EMBEDDING_SIZES[size], 1024),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(1024, 1024),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(1024, 512),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(512, self.final_embedding_size),
+        )
+
+    def forward(self, x):
+        output = self.dino(x, average_non_masked_patches=False)
+        embeddings_final = self.fc(output)
+        return embeddings_final

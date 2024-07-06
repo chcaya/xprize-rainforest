@@ -92,6 +92,7 @@ class ContrastiveDataset:
                  dataset_config: dict,
                  min_level: str,
                  image_size: int,
+                 random_crop: bool,
                  transform: albumentations.core.composition.Compose,
                  taxa_distances_df: pd.DataFrame or None,
                  max_resampling_times: int,
@@ -103,6 +104,7 @@ class ContrastiveDataset:
         self.dataset_config = dataset_config
         self.min_level = min_level
         self.image_size = image_size
+        self.random_crop = random_crop
         self.transform = transform
         self.taxa_distances_df = taxa_distances_df
         self.normalize = normalize
@@ -297,12 +299,31 @@ class ContrastiveDataset:
             data = tile_file.read([1, 2, 3])
 
         if data.shape[1] > self.image_size:
-            # crop
-            data_center = int(data.shape[1] / 2)
-            data = data[:,
-                        data_center - self.image_size // 2:data_center + self.image_size // 2,
-                        data_center - self.image_size // 2:data_center + self.image_size // 2,
-                        ]
+            if self.random_crop:
+                x_max = data.shape[1] - self.image_size
+                y_max = data.shape[2] - self.image_size
+
+                # Function to perform random crop and check for black pixels
+                def random_crop_with_black_check():
+                    max_tries = 20
+                    for _ in range(max_tries):
+                        x = np.random.randint(0, x_max)
+                        y = np.random.randint(0, y_max)
+                        cropped_data = data[:, x:x + self.image_size, y:y + self.image_size]
+                        black_pixels = np.sum(cropped_data == 0) / (self.image_size * self.image_size * 3)
+                        if black_pixels <= 0.4:
+                            return cropped_data
+                    # If no valid crop is found, return the last attempted crop
+                    return cropped_data
+
+                data = random_crop_with_black_check()
+            else:
+                # crop
+                data_center = int(data.shape[1] / 2)
+                data = data[:,
+                            data_center - self.image_size // 2:data_center + self.image_size // 2,
+                            data_center - self.image_size // 2:data_center + self.image_size // 2,
+                            ]
         elif data.shape[1] < self.image_size:
             # pad
             padding = (self.image_size - data.shape[1]) // 2

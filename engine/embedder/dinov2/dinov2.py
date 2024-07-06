@@ -21,8 +21,9 @@ from engine.utils.utils import collate_fn_segmentation
 
 
 class DINOv2Preprocessor:
-    def __init__(self, vit_patch_size: int, instance_normalization: bool, mean_std_descriptor: str = None):
+    def __init__(self, vit_patch_size: int, normalize: bool, instance_normalization: bool, mean_std_descriptor: str = None):
         self.vit_patch_size = vit_patch_size
+        self.normalize = normalize
         self.instance_normalization = instance_normalization
         self.mean_std_descriptor = mean_std_descriptor
 
@@ -36,17 +37,18 @@ class DINOv2Preprocessor:
         return pad_size_left, pad_size_right
 
     def preprocess(self, x: torch.Tensor):
-        if self.instance_normalization:
-            mean = x.mean(dim=(2, 3), keepdim=True)
-            var = x.var(dim=(2, 3), keepdim=True, unbiased=False)
-            x = tvf.normalize(x, mean=list(mean[0,:,0,0]), std=list(var[0,:,0,0]))
-        else:
-            if self.mean_std_descriptor == 'imagenet':
-                x = tvf.normalize(x, mean=list(IMAGENET_MEAN), std=list(IMAGENET_STD))
-            elif self.mean_std_descriptor == 'forest_qpeb':
-                x = tvf.normalize(x, mean=list(FOREST_QPEB_MEAN), std=list(FOREST_QPEB_STD))
+        if self.normalize:
+            if self.instance_normalization:
+                mean = x.mean(dim=(2, 3), keepdim=True)
+                var = x.var(dim=(2, 3), keepdim=True, unbiased=False)
+                x = tvf.normalize(x, mean=list(mean[0,:,0,0]), std=list(var[0,:,0,0]))
             else:
-                raise ValueError("Invalid mean_std_descriptor value. Valid values are ['imagenet', 'forest_qpeb']")
+                if self.mean_std_descriptor == 'imagenet':
+                    x = tvf.normalize(x, mean=list(IMAGENET_MEAN), std=list(IMAGENET_STD))
+                elif self.mean_std_descriptor == 'forest_qpeb':
+                    x = tvf.normalize(x, mean=list(FOREST_QPEB_MEAN), std=list(FOREST_QPEB_STD))
+                else:
+                    raise ValueError("Invalid mean_std_descriptor value. Valid values are ['imagenet', 'forest_qpeb']")
 
         pads = list(itertools.chain.from_iterable(self._get_pad(m) for m in x.shape[:1:-1]))
         x = F.pad(x, pads)
@@ -63,19 +65,34 @@ class DINOv2Preprocessor:
 
 class DINOv2Inference:
     SUPPORTED_SIZES = ['small', 'base', 'large', 'giant']
+    EMBEDDING_SIZES = {
+        'small': 384,
+        'base': 768,
+        'large': 1024,
+        'giant': 1536
+    }
 
-    def __init__(self, config: DINOv2InferConfig):
-        self.config = config
+    def __init__(self,
+                 size: str,
+                 normalize: bool,
+                 instance_segmentation: bool,
+                 mean_std_descriptor: str = None,):
+
+        self.size = size
+        self.normalize = normalize
+        self.instance_segmentation = instance_segmentation
+        self.mean_std_descriptor = mean_std_descriptor
+
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.vit_patch_size = 14
         self.model = self._load_model()
-        self.preprocessor = DINOv2Preprocessor(self.vit_patch_size, self.config.instance_segmentation, self.config.mean_std_descriptor)
+        self.preprocessor = DINOv2Preprocessor(self.vit_patch_size, self.normalize, self.instance_segmentation, self.mean_std_descriptor)
 
     def _load_model(self):
-        assert self.config.size in self.SUPPORTED_SIZES, \
-            f"Invalid DINOv2 model size: \'{self.config.size}\'. Valid value are {self.SUPPORTED_SIZES}."
+        assert self.size in self.SUPPORTED_SIZES, \
+            f"Invalid DINOv2 model size: \'{self.size}\'. Valid value are {self.SUPPORTED_SIZES}."
 
-        model_name = f"dinov2_vit{self.config.size[0]}{self.vit_patch_size}_reg"
+        model_name = f"dinov2_vit{self.size[0]}{self.vit_patch_size}_reg"
 
         return torch.hub.load('facebookresearch/dinov2', model_name, pretrained=True).to(self.device)
 
@@ -101,9 +118,12 @@ class DINOv2Inference:
 
             return output_pp, pads
 
-    def infer_on_segmentation_dataset(self, dataset: SegmentationLabeledRasterCocoDataset, average_non_masked_patches: bool):
+    def infer_on_segmentation_dataset(self,
+                                      dataset: SegmentationLabeledRasterCocoDataset,
+                                      average_non_masked_patches: bool,
+                                      batch_size: int):
         data_loader = torch.utils.data.DataLoader(dataset,
-                                                  batch_size=self.config.batch_size,
+                                                  batch_size=batch_size,
                                                   num_workers=3,
                                                   collate_fn=collate_fn_segmentation)
 
@@ -114,8 +134,10 @@ class DINOv2Inference:
         for i, x in enumerate(tqdm_dataset):
             images = x[0]
             labels = x[1]
+
             embeddings, image_pads = self(images, average_non_masked_patches=average_non_masked_patches)
             for j, label in enumerate(labels):
+                embedding = embeddings[j]
                 image_masks = label['masks']
                 image_masks = image_masks.cpu().detach().numpy()
 
@@ -132,14 +154,14 @@ class DINOv2Inference:
                 )
 
                 if average_non_masked_patches:
-                    down_sampled_masks_patches_embeddings = embeddings[j] * down_sampled_masks[:, :, :, np.newaxis]
+                    down_sampled_masks_patches_embeddings = embedding * down_sampled_masks[:, :, :, np.newaxis]
                     down_sampled_masks_embeddings = np.sum(down_sampled_masks_patches_embeddings, axis=(1, 2))
 
                     non_zero_mask = down_sampled_masks > 0
                     non_zero_count = np.sum(non_zero_mask, axis=(1, 2))
                     non_zero_count = np.where(non_zero_count == 0, 1, non_zero_count)
                     non_zero_patches_mean = down_sampled_masks_embeddings / non_zero_count[:, np.newaxis]
-                    embeddings = non_zero_patches_mean
+                    embedding = non_zero_patches_mean
 
                 df = pd.DataFrame({
                     'labels': label['labels'].numpy().tolist(),
@@ -147,7 +169,7 @@ class DINOv2Inference:
                     'iscrowd': label['iscrowd'].numpy().tolist(),
                     'image_id': [int(label['image_id'][0])] * len(label['labels']),
                     'tiles_paths': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels']),
-                    'embeddings': embeddings.tolist(),
+                    'embeddings': [embedding],
                     'down_sampled_masks': down_sampled_masks.tolist()
                 })
                 dfs.append(df)
@@ -179,6 +201,8 @@ class DINOv2Inference:
         #     df['down_sampled_masks'] = down_sampled_masks.tolist()
 
         final_df = pd.concat(dfs)
+
+        final_df['embeddings'] = final_df['embeddings'].apply(lambda x: x[0])
 
         print("Done.")
 
