@@ -331,6 +331,11 @@ class ContrastiveDataset:
             padded_data[:, padding:padding + data.shape[1], padding:padding + data.shape[1]] = data
             data = padded_data
 
+        if self.transform:
+            data = data.transpose((1, 2, 0))
+            data = self.transform(image=data)['image']
+            data = data.transpose((2, 0, 1))
+
         data = data / 255
 
         if self.normalize:
@@ -376,6 +381,11 @@ class ContrastiveInferDataset(BaseContrastiveLabeledCocoDataset):
             padded_data = np.zeros((data.shape[0], self.image_size, self.image_size), dtype=data.dtype)
             padded_data[:, padding:padding + data.shape[1], padding:padding + data.shape[1]] = data
             data = padded_data
+
+        if self.transform:
+            data = data.transpose((1, 2, 0))
+            data = self.transform(image=data)['image']
+            data = data.transpose((2, 0, 1))
 
         data = data / 255
 
