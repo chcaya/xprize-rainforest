@@ -127,6 +127,53 @@ def tilerize_brazil_trees(output_folder: Path, ground_resolution: float, max_til
         tilerizer.generate_coco_dataset()
 
 
+def tilerize_brazil_trees_additional_data(output_folder: Path, ground_resolution: float, max_tile_size: int):
+    aoi_config = AOIFromPackageConfig(aois={
+        'train': pkg_resources.files(aois) / 'brazil_zf2_trees/brazil_zf2_species_train_aoi.gpkg',
+        'valid': pkg_resources.files(aois) / 'brazil_zf2_trees/brazil_zf2_species_valid_aoi.gpkg',
+        'test': pkg_resources.files(aois) / 'brazil_zf2_trees/brazil_zf2_species_test_aoi.gpkg'
+    })
+
+    labels = [
+        '/media/hugo/Hard Disk 1/XPrize/Data/raw/brazil_zf2_new/20240130_zf2tower_ms_m3m_labels_aligned_SAMthreshold1p0.gpkg',
+        '/media/hugo/Hard Disk 1/XPrize/Data/raw/brazil_zf2_new/20240130_zf2transectew_m3m_labels_aligned_SAMthreshold1p0.gpkg',
+        '/media/hugo/Hard Disk 1/XPrize/Data/raw/brazil_zf2_new/20240131_zf2block4_ms_m3m_labels_aligned_SAMthreshold1p0.gpkg',
+        '/media/hugo/Hard Disk 1/XPrize/Data/raw/brazil_zf2_new/20240520_zf2quad_m3m_labels_aligned_SAMthreshold1p0.gpkg',
+    ]
+
+    rasters = [
+        '/home/hugo/Documents/xprize/data/20240130_zf2tower_ms_m3m_rgb.cog.tif',
+        '/media/hugo/Hard Disk 1/XPrize/Data/raw/brazil_zf2_new/20240130_zf2transectew_m3m_rgb.tif',
+        '/home/hugo/Documents/xprize/data/20240131_zf2block4_ms_m3m_rgb.cog.tif',
+        '/home/hugo/Documents/xprize/data/20240520_zf2quad_m3m_rgb.cog.tif',
+    ]
+
+    output_suffixes = [
+        'from_detector',
+        'from_detector',
+        'from_detector',
+        'from_detector',
+    ]
+
+    for label, raster, output_suffix in zip(labels, rasters, output_suffixes):
+        tilerizer = PolygonTilerizer(
+            raster_path=Path(raster),
+            labels_path=Path(label),
+            output_path=output_folder / f'brazil_zf2_additional_data/{output_suffix}',
+            output_name_suffix=output_suffix,
+            ground_resolution=ground_resolution,
+            scale_factor=None,
+            use_variable_tile_size=True,
+            variable_tile_size_pixel_buffer=10,
+            aois_config=aoi_config,
+            tile_size=max_tile_size,
+            coco_categories_list=json.load(open(str(pkg_resources.files(categories) / 'brazil_zf2_trees/brazil_zf2_trees_categories.json')))['categories'],
+            main_label_category_column_name='canonicalName'
+        )
+
+        tilerizer.generate_coco_dataset()
+
+
 def tilerize_equator_trees(output_folder: Path, ground_resolution: float, max_tile_size: int):
     aoi_config = AOIFromPackageConfig(aois={
         'train': pkg_resources.files(aois) / 'equator_tiputini_trees/equator_species_train_aoi.gpkg',
@@ -260,11 +307,12 @@ if __name__ == "__main__":
     ground_resolution = 0.03
     max_tile_size = 1536
 
-    output_folder = Path(f'/media/hugobaudchon/4 TB/XPrize/Data/pre_processed/FINAL_polygon_dataset_{max_tile_size}px_gr{str(ground_resolution).replace(".", "p")}')
+    output_folder = Path(f'/home/hugo/Documents/xprize/data/FINAL_polygon_dataset_{max_tile_size}px_gr{str(ground_resolution).replace(".", "p")}')
 
     # tilerize_quebec_trees(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
     # tilerize_brazil_trees(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
     # tilerize_equator_trees(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
-    tilerize_panama_trees(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
+    # tilerize_panama_trees(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
+    tilerize_brazil_trees_additional_data(output_folder=output_folder, ground_resolution=ground_resolution, max_tile_size=max_tile_size)
 
 
