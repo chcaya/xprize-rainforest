@@ -30,32 +30,15 @@ class XPrizeTreeEmbedder(nn.Module):
 
         # Adding a new fully connected layer to create embeddings
         self.fc = nn.Sequential(
-            nn.Linear(2048 + 4, 1536),
+            nn.Linear(2048, 1536),
             nn.ReLU(),
             nn.Dropout(p=dropout),
             nn.Linear(1536, self.final_embedding_size),
         )
 
-    @staticmethod
-    def _get_date_encoding(month, day):
-        # Sinusoidal encoding for month
-        month_sin = torch.sin(2 * math.pi * month / 12).unsqueeze(1)
-        month_cos = torch.cos(2 * math.pi * month / 12).unsqueeze(1)
-
-        # Sinusoidal encoding for day
-        day_sin = torch.sin(2 * math.pi * day / 31).unsqueeze(1)
-        day_cos = torch.cos(2 * math.pi * day / 31).unsqueeze(1)
-
-        # Concatenate in a single tensor of size batch_size x 4
-        date_encodings = torch.cat((month_sin, month_cos, day_sin, day_cos), dim=1)
-
-        return date_encodings
-
-    def forward(self, x, month, day):
+    def forward(self, x):
         output = self.backbone(x)
-        date_encoding = self._get_date_encoding(month, day)
-        embeddings_concat = torch.cat((output, date_encoding), dim=1)
-        embeddings_final = self.fc(embeddings_concat)
+        embeddings_final = self.fc(output)
         return embeddings_final
 
 
@@ -218,10 +201,12 @@ class DinoV2Embedder(nn.Module):
                  dropout: float):
         super(DinoV2Embedder, self).__init__()
 
+        self.size = size
         self.final_embedding_size = final_embedding_size
+        self.dropout = dropout
 
         self.dino = DINOv2Inference(
-            size=size,
+            size=self.size,
             normalize=False,    # done in the dataset
             instance_segmentation=False,
             mean_std_descriptor=None
@@ -237,13 +222,32 @@ class DinoV2Embedder(nn.Module):
             nn.Linear(1024, 1024),
             nn.ReLU(),
             nn.Dropout(p=dropout),
-            nn.Linear(1024, 512),
+            nn.Linear(1024, 1024),
             nn.ReLU(),
             nn.Dropout(p=dropout),
-            nn.Linear(512, self.final_embedding_size),
+            nn.Linear(1024, self.final_embedding_size),
         )
 
     def forward(self, x):
-        output = self.dino(x, average_non_masked_patches=False)
+        output, _ = self.dino(x, average_non_masked_patches=False)
         embeddings_final = self.fc(output)
         return embeddings_final
+
+    def save(self, path):
+        torch.save({
+            'model_state_dict': self.fc.state_dict(),
+            'size': self.size,
+            'final_embedding_size': self.final_embedding_size,
+            'dropout': self.dropout
+        }, path)
+
+    @classmethod
+    def from_checkpoint(cls,
+                        checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+
+        model = cls(size=checkpoint['size'],
+                    final_embedding_size=checkpoint['final_embedding_size'],
+                    dropout=checkpoint['dropout'])
+        model.fc.load_state_dict(checkpoint['model_state_dict'])
+        return model

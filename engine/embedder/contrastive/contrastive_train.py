@@ -46,23 +46,24 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
           writer: SummaryWriter,
           output_dir: Path,
           num_epochs: int,
+          validate_every_n_epochs: int,
           valid_knn_k: int):
 
     if use_multi_gpu:
         model = nn.DataParallel(model)
     model.to(device)
 
-    model.eval()
-    with torch.no_grad():
-        validate(
-            model=model,
-            train_loader=valid_train_dataloader,
-            valid_dataloaders=valid_dataloaders,
-            distance=distance,
-            overall_step=0,
-            writer=writer,
-            valid_knn_k=valid_knn_k
-        )
+    # model.eval()
+    # with torch.no_grad():
+    #     validate(
+    #         model=model,
+    #         train_loader=valid_train_dataloader,
+    #         valid_dataloaders=valid_dataloaders,
+    #         distance=distance,
+    #         overall_step=0,
+    #         writer=writer,
+    #         valid_knn_k=valid_knn_k
+    #     )
 
     scaler = torch.cuda.amp.GradScaler()  # Initialize the GradScaler for mixed precision training
 
@@ -91,7 +92,7 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
                     actual_model = model
 
                 if isinstance(actual_model, XPrizeTreeEmbedder):
-                    embeddings = model(imgs, months, days)
+                    embeddings = model(imgs)
                     indices_tuple = mining_func(embeddings, labels_ids)
                     loss = criterion_metric(embeddings=embeddings, labels=labels_ids, indices_tuple=indices_tuple)
                 elif isinstance(actual_model, XPrizeTreeEmbedder2):
@@ -153,24 +154,27 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
             scaler.update()
             optimizer.zero_grad()
 
-        model.eval()
-        with torch.no_grad():
-            valid_loss = validate(
-                model=model,
-                train_loader=valid_train_dataloader,
-                valid_dataloaders=valid_dataloaders,
-                distance=distance,
-                overall_step=overall_step,
-                writer=writer,
-                valid_knn_k=valid_knn_k
-            )
+        if epoch % validate_every_n_epochs == 0 and epoch != 0:
+            model.eval()
+            with torch.no_grad():
+                valid_loss = validate(
+                    model=model,
+                    train_loader=valid_train_dataloader,
+                    valid_dataloaders=valid_dataloaders,
+                    distance=distance,
+                    overall_step=overall_step,
+                    writer=writer,
+                    valid_knn_k=valid_knn_k
+                )
 
-        checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
-        save_model(model, checkpoint_output_file=checkpoint_output_file)
+            checkpoint_output_file = os.path.join(output_dir, f'checkpoint_{epoch}_{overall_step}.pth')
+            save_model(model, checkpoint_output_file=checkpoint_output_file)
+            print(f'Epoch {epoch}, Train Loss: {total_loss / len(train_dataloader)}, Valid Loss: {valid_loss}')
+        else:
+            print(f'Epoch {epoch}, Train Loss: {total_loss / len(train_dataloader)}')
+
         scheduler.step()
         model.train()
-
-        print(f'Epoch {epoch}, Train Loss: {total_loss / len(train_dataloader)}, Valid Loss: {valid_loss}')
 
 
 def validate(model,
@@ -239,14 +243,15 @@ def validate(model,
             total_classification_macro_f1 += f1_macro * len(valid_families)
             total_classification_samples += len(valid_families)
 
-    accuracy_train = accuracy_score(train_families, train_predicted_families)
-    writer.add_scalar(f'Train/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_train, overall_step)
-    print(f'Train Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_train}')
+    if train_predicted_families is not None and train_predicted_families[0] is not None:
+        accuracy_train = accuracy_score(train_families, train_predicted_families)
+        writer.add_scalar(f'Train/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_train, overall_step)
+        print(f'Train Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_train}')
+        writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', total_classification_accuracy / total_classification_samples, overall_step)
+        writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', total_classification_macro_f1 / total_classification_samples, overall_step)
 
     writer.add_scalar('Valid/KNN/Accuracy', total_knn_accuracy / total_knn_samples, overall_step)
     writer.add_scalar('Valid/KNN/Macro_F1', total_knn_macro_f1 / total_knn_samples, overall_step)
-    writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', total_classification_accuracy / total_classification_samples, overall_step)
-    writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', total_classification_macro_f1 / total_classification_samples, overall_step)
 
     all_valid_embeddings = np.concatenate(all_valid_embeddings, axis=0)
     all_valid_labels_ids = np.concatenate(all_valid_labels_ids, axis=0)
@@ -262,116 +267,39 @@ def validate(model,
     final_valid_loss = valid_loss / triplets_tuples[0].shape[0]
     writer.add_scalar('Valid/Loss_Triplet', final_valid_loss, overall_step)
 
+    average_distance = get_average_embeddings_distance(torch.Tensor(train_embeddings).to(device))
+    writer.add_scalar('Train/Average_Embeddings_Distance', average_distance, overall_step)
+
     return final_valid_loss
 
 
-def validate_for_classification(model,
-                                train_dataset,
-                                valid_train_dataset_for_classification,
-                                valid_valid_dataset_for_classification,
-                                valid_batch_size,
-                                distance,
-                                overall_step,
-                                epoch,
-                                writer,
-                                data_loader_num_workers,
-                                use_multi_gpu):
-    print(f'Validating for epoch {epoch}...')
+def get_average_embeddings_distance(embeddings: torch.Tensor, n_max=1000):
+    train_embeddings_np = embeddings.cpu().numpy()
 
-    valid_train_loader_for_classification = torch.utils.data.DataLoader(valid_train_dataset_for_classification,
-                                                                        batch_size=valid_batch_size, shuffle=False,
-                                                                        num_workers=data_loader_num_workers,
-                                                                        collate_fn=contrastive_collate_fn)
-    valid_valid_loader_for_classification = torch.utils.data.DataLoader(valid_valid_dataset_for_classification,
-                                                                        batch_size=valid_batch_size, shuffle=False,
-                                                                        num_workers=data_loader_num_workers,
-                                                                        collate_fn=contrastive_collate_fn)
+    # Number of embeddings
+    n = train_embeddings_np.shape[0]
 
-    model.eval()
-    with torch.no_grad():
-        train_labels, train_labels_ids, train_families, train_families_ids, train_embeddings, train_predicted_families, _ = infer_model_with_labels(model, valid_train_loader_for_classification, device, use_mixed_precision=False, desc='Inferring train samples...')
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families, _ = infer_model_with_labels(model, valid_valid_loader_for_classification, device, use_mixed_precision=False, desc='Inferring valid samples...')
+    # If the number of pairs is manageable, compute all distances
+    if n <= n_max:
+        # Compute the pairwise distance matrix
+        distances = np.linalg.norm(train_embeddings_np[:, np.newaxis] - train_embeddings_np, axis=2)
 
-        train_to_delete = train_labels == -1
-        valid_to_delete = valid_labels == -1
+        # Compute the average distance
+        average_distance = np.mean(distances)
+    else:
+        # Randomly sample pairs if there are too many pairs
 
-        train_embeddings = train_embeddings[~train_to_delete]
-        train_labels = train_labels[~train_to_delete]
-        valid_embeddings = valid_embeddings[~valid_to_delete]
-        valid_labels = valid_labels[~valid_to_delete]
+        indices = np.random.choice(n, n_max, replace=False)
+        sampled_embeddings_np = train_embeddings_np[indices]
 
-        # Standardize the embeddings
-        scaler_standard = StandardScaler()
-        X_train = scaler_standard.fit_transform(train_embeddings)
-        X_test = scaler_standard.transform(valid_embeddings)
+        sampled_distances = np.linalg.norm(sampled_embeddings_np[:, np.newaxis] - sampled_embeddings_np, axis=2).flatten()
 
-        # Train the SVC
-        k_neighbors = KNeighborsClassifier(n_neighbors=5, metric=distance)
-        k_neighbors.fit(X_train, train_labels)
-        predictions = k_neighbors.predict(X_test)
+        # Compute the average distance of the sampled pairs
+        average_distance = np.mean(sampled_distances)
 
-        accuracy = accuracy_score(valid_labels, predictions)
-        metrics = precision_recall_fscore_support(valid_labels, predictions, average='macro')
-        metrics_weighted = precision_recall_fscore_support(valid_labels, predictions, average='weighted')
-        writer.add_scalar('Valid/KNN/Accuracy', accuracy, overall_step)
-        writer.add_scalar('Valid/KNN/Macro_Precision', metrics[0], overall_step)
-        writer.add_scalar('Valid/KNN/Macro_Recall', metrics[1], overall_step)
-        writer.add_scalar('Valid/KNN/Macro_F1', metrics[2], overall_step)
-        writer.add_scalar('Valid/KNN/Weighted_Precision', metrics_weighted[0], overall_step)
-        writer.add_scalar('Valid/KNN/Weighted_Recall', metrics_weighted[1], overall_step)
-        writer.add_scalar('Valid/KNN/Weighted_F1', metrics_weighted[2], overall_step)
-        print(f'Validation Accuracy: KNN: {accuracy}')
+    print(f"Average distance between pairs: {average_distance}")
 
-        if isinstance(model, nn.DataParallel):
-            actual_model = model.module
-        else:
-            actual_model = model
-
-        if isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
-            accuracy_train = accuracy_score(train_families, train_predicted_families)
-            accuracy_valid = accuracy_score(valid_families, valid_predicted_families)
-            f1_macro = precision_recall_fscore_support(valid_families, valid_predicted_families, average='macro')[2]
-            f1_weighted = precision_recall_fscore_support(valid_families, valid_predicted_families, average='weighted')[2]
-            writer.add_scalar('Train/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
-            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Accuracy', accuracy_valid, overall_step)
-            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Macro_F1', f1_macro, overall_step)
-            writer.add_scalar('Valid/Family_XPrizeTreeEmbedder2/Weighted_F1', f1_weighted, overall_step)
-            print(f'Validation Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_valid}')
-            print(f'Train Accuracy: Family_XPrizeTreeEmbedder2: {accuracy_train}')
-
-
-def validate_for_loss(model,
-                      valid_dataset,
-                      valid_batch_size,
-                      criterion_metric,
-                      epoch,
-                      overall_step,
-                      writer,
-                      data_loader_num_workers,
-                      use_multi_gpu):
-    print(f'Validating for epoch {epoch}...')
-
-    # sampler = MPerClassSampler(valid_dataset.all_samples_labels, m=4, batch_size=valid_batch_size, length_before_new_iter=len(valid_dataset))
-    sampler = FixedSetOfTriplets(valid_dataset.all_samples_labels, len(valid_dataset) * 10)
-    triplets_tuples = (sampler.fixed_set_of_triplets[:, 0], sampler.fixed_set_of_triplets[:, 1], sampler.fixed_set_of_triplets[:, 2])
-    valid_loader = DataLoader(valid_dataset,
-                              shuffle=False,
-                              batch_size=valid_batch_size,
-                              collate_fn=contrastive_collate_fn,
-                              pin_memory=use_multi_gpu,
-                              num_workers=data_loader_num_workers,
-                              )
-
-    total_loss = 0
-
-    model.eval()
-    with torch.no_grad():
-        valid_labels, valid_labels_ids, valid_families, valid_families_ids, valid_embeddings, valid_predicted_families, _ = infer_model_with_labels(model, valid_loader, device, use_mixed_precision=False, as_numpy=False)
-        total_loss = criterion_metric(embeddings=valid_embeddings, labels=valid_labels_ids, indices_tuple=triplets_tuples)
-
-        writer.add_scalar('Valid/Loss_Triplet', total_loss / triplets_tuples[0].shape[0], overall_step)
-
-        return total_loss / len(valid_loader)
+    return average_distance
 
 
 if __name__ == '__main__':
@@ -398,8 +326,10 @@ if __name__ == '__main__':
     start_from_checkpoint = yaml_config['start_from_checkpoint']
     learning_rate = yaml_config['learning_rate']
     train_batch_size = yaml_config['train_batch_size']
+    triplet_sampler_m = yaml_config['triplet_sampler_m']
     n_grad_accumulation_steps = yaml_config['n_grad_accumulation_steps']
     valid_batch_size = train_batch_size * yaml_config['valid_batch_size_multiplier']
+    validate_every_n_epochs = yaml_config['validate_every_n_epochs']
     image_size = yaml_config['image_size']
     random_crop = yaml_config['random_crop']
     loss_weight_triplet = yaml_config['loss_weight_triplet']
@@ -408,7 +338,10 @@ if __name__ == '__main__':
     triplet_type = yaml_config['triplet_type']
     dropout = yaml_config['dropout']
     final_embedding_size = yaml_config['final_embedding_size']
+    scheduler_name = yaml_config['scheduler_name']
+    scheduler_gamma = yaml_config['scheduler_gamma']
     scheduler_T = yaml_config['scheduler_T']
+    scheduler_T_mult = yaml_config['scheduler_T_mult']
     n_warmup_epochs = yaml_config['n_warmup_epochs']
     num_epochs = yaml_config['num_epochs']
     data_loader_num_workers = yaml_config['data_loader_num_workers']
@@ -430,7 +363,8 @@ if __name__ == '__main__':
     if 'brazil' in use_datasets:
         train_dataset_brazil = ContrastiveInternalDataset(
             fold='train',
-            root_path=source_data_root / 'brazil_zf2',
+            root_path=[source_data_root / 'brazil_zf2',
+                       source_data_root / 'brazil_zf2_additional_data'],
             date_pattern=brazil_date_pattern
         )
         train_dataset_config['brazil'] = train_dataset_brazil
@@ -473,7 +407,7 @@ if __name__ == '__main__':
         dataset_config=train_dataset_config,
         min_level=min_level,
         image_size=image_size,
-        random_crop=random_crop,
+        random_crop=False,
         transform=A.Compose(embedder_simple_transforms_v2),
         normalize=True,
         mean=FOREST_QPEB_MEAN,
@@ -486,13 +420,15 @@ if __name__ == '__main__':
     if 'brazil' in use_datasets:
         valid_dataset_brazil = ContrastiveInternalDataset(
             fold='valid',
-            root_path=source_data_root / 'brazil_zf2',
+            root_path=[source_data_root / 'brazil_zf2',
+                       source_data_root / 'brazil_zf2_additional_data'],
             date_pattern=brazil_date_pattern
         )
         valid_datasets['brazil'] = ContrastiveDataset(
             dataset_config={'brazil': valid_dataset_brazil},
             min_level=min_level,
             image_size=image_size,
+            random_crop=False,
             transform=None,
             normalize=True,
             mean=FOREST_QPEB_MEAN,
@@ -561,6 +497,12 @@ if __name__ == '__main__':
 
     print('Datasets loaded successfully.')
 
+    model = XPrizeTreeEmbedder(
+        resnet_model=resnet_model,
+        final_embedding_size=final_embedding_size,
+        dropout=dropout
+    )
+
     # model = XPrizeTreeEmbedder2(
     #     resnet_model=resnet_model,
     #     final_embedding_size=final_embedding_size,
@@ -576,16 +518,16 @@ if __name__ == '__main__':
     #     families=list(siamese_sampler_dataset_train.families_set),
     # ).to(device)
 
-    model = DinoV2Embedder(
-        size='small',
-        final_embedding_size=final_embedding_size,
-        dropout=dropout
-    ).to(device)
+    # model = DinoV2Embedder(
+    #     size='small',
+    #     final_embedding_size=final_embedding_size,
+    #     dropout=dropout
+    # ).to(device)
 
     if start_from_checkpoint:
         if isinstance(model, XPrizeTreeEmbedder):
             model.load_state_dict(torch.load(start_from_checkpoint))
-        elif isinstance(model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
+        elif isinstance(model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate, DinoV2Embedder)):
             model = model.from_checkpoint(start_from_checkpoint)
         else:
             raise ValueError(f'Unknown model type: {model.__class__}')
@@ -606,7 +548,13 @@ if __name__ == '__main__':
     )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=0.01)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=scheduler_T)
+    if scheduler_name == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=scheduler_T, T_mult=scheduler_T_mult)
+    elif scheduler_name == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=scheduler_gamma)
+    else:
+        raise ValueError(f'Unknown scheduler: {scheduler_name}')
+
     scheduler = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=n_warmup_epochs, after_scheduler=scheduler)
     optimizer.step()  # Step once to avoid lr of 0 from scheduler
     scheduler.step()  # Step once to avoid lr of 0 from scheduler
@@ -618,7 +566,7 @@ if __name__ == '__main__':
     with open(output_dir / 'contrastive_train_config.yaml', 'w') as config_file:
         yaml.safe_dump(yaml_config, config_file)
 
-    train_sampler = MPerClassSampler(siamese_sampler_dataset_train.all_samples_labels, m=4, batch_size=train_batch_size, length_before_new_iter=len(siamese_sampler_dataset_train))
+    train_sampler = MPerClassSampler(siamese_sampler_dataset_train.all_samples_labels, m=triplet_sampler_m, batch_size=train_batch_size, length_before_new_iter=len(siamese_sampler_dataset_train))
     train_dataloader = DataLoader(
         siamese_sampler_dataset_train,
         batch_size=train_batch_size,
@@ -626,6 +574,7 @@ if __name__ == '__main__':
         pin_memory=use_multi_gpu,
         num_workers=data_loader_num_workers,
         sampler=train_sampler,
+        prefetch_factor=5
     )
 
     valid_train_dataloader = DataLoader(
@@ -633,7 +582,8 @@ if __name__ == '__main__':
         batch_size=train_batch_size,
         collate_fn=contrastive_collate_fn,
         pin_memory=use_multi_gpu,
-        num_workers=data_loader_num_workers
+        num_workers=data_loader_num_workers,
+        prefetch_factor=5,
     )
 
     valid_dataloaders = {}
@@ -664,6 +614,7 @@ if __name__ == '__main__':
         writer=writer,
         output_dir=output_dir,
         num_epochs=num_epochs,
+        validate_every_n_epochs=validate_every_n_epochs,
         valid_knn_k=valid_knn_k
     )
 

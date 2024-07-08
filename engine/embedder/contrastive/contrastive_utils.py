@@ -6,7 +6,7 @@ import heapq
 from torch import nn
 
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder, XPrizeTreeEmbedder2, \
-    XPrizeTreeEmbedder2NoDate
+    XPrizeTreeEmbedder2NoDate, DinoV2Embedder
 
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406])
 IMAGENET_STD = np.array([0.229, 0.224, 0.225])
@@ -41,7 +41,7 @@ def save_model(model, checkpoint_output_file):
 
     if isinstance(actual_model, XPrizeTreeEmbedder):
         torch.save(actual_model.state_dict(), checkpoint_output_file)
-    elif isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate)):
+    elif isinstance(actual_model, (XPrizeTreeEmbedder2, XPrizeTreeEmbedder2NoDate, DinoV2Embedder)):
         actual_model.save(checkpoint_output_file)
     else:
         raise NotImplementedError(f"Model type not supported for saving: {type(actual_model)}.")

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from engine.embedder.contrastive.contrastive_dataset import ContrastiveDataset, ContrastiveInternalDataset, \
     ContrastiveInferDataset
 from engine.embedder.contrastive.contrastive_model import XPrizeTreeEmbedder2NoDate, XPrizeTreeEmbedder, \
-    XPrizeTreeEmbedder2
+    XPrizeTreeEmbedder2, DinoV2Embedder
 from engine.embedder.contrastive.contrastive_utils import ConditionalAutocast, FOREST_QPEB_MEAN, FOREST_QPEB_STD, \
     IMAGENET_MEAN, IMAGENET_STD, contrastive_infer_collate_fn
 
@@ -62,6 +62,7 @@ def contrastive_classifier_embedder_infer(data_roots: str or List[str],
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f'Loading model from {contrastive_checkpoint}')
+    raise Exception('change model here.')
     model = XPrizeTreeEmbedder2NoDate.from_checkpoint(contrastive_checkpoint).to(device)
     model.eval()
 
@@ -165,8 +166,10 @@ def infer_model_with_labels(model, dataloader, device, use_mixed_precision, desc
             all_families_ids = torch.cat((all_families_ids, families_ids.detach().cpu()), dim=0)
             all_embeddings = torch.cat((all_embeddings, embeddings.detach().cpu()), dim=0)
             all_predicted_families.extend(predicted_families)
-            all_predicted_families_scores = torch.cat(
-                (all_predicted_families_scores, predicted_families_scores.detach().cpu()), dim=0)
+            if predicted_families_scores is not None:
+                all_predicted_families_scores = torch.cat((all_predicted_families_scores, predicted_families_scores.detach().cpu()), dim=0)
+            else:
+                all_predicted_families_scores = None
 
         if as_numpy:
             all_labels = np.array(all_labels)
@@ -175,7 +178,8 @@ def infer_model_with_labels(model, dataloader, device, use_mixed_precision, desc
             all_families_ids = all_families_ids.numpy()
             all_embeddings = all_embeddings.numpy()
             all_predicted_families = np.array(all_predicted_families)
-            all_predicted_families_scores = all_predicted_families_scores.numpy()
+            if all_predicted_families_scores is not None:
+                all_predicted_families_scores = all_predicted_families_scores.numpy()
 
         return all_labels, all_labels_ids, all_families, all_families_ids, all_embeddings, all_predicted_families, all_predicted_families_scores
 
@@ -194,12 +198,12 @@ def infer_batch(images, months, days, model, device, use_mixed_precision):
             actual_model = model
 
         with ConditionalAutocast(use_mixed_precision):
-            if isinstance(actual_model, XPrizeTreeEmbedder2NoDate):
+            if isinstance(actual_model, (XPrizeTreeEmbedder, XPrizeTreeEmbedder2NoDate, DinoV2Embedder)):
                 output = model(data)
             else:
                 output = model(data, months, days)
 
-        if isinstance(actual_model, XPrizeTreeEmbedder):
+        if isinstance(actual_model, (XPrizeTreeEmbedder, DinoV2Embedder)):
             embeddings = output
             predicted_families_scores = None
             predicted_families = [None] * len(images)
