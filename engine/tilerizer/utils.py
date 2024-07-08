@@ -9,7 +9,7 @@ def parse_tilerizer_aoi_config(config: TilerizerConfig):
     if not config.aoi_config:
         aois_config = AOIGeneratorConfig(
             aoi_type="band",
-            aois={'all': {'percentage': 100, 'position': 1}}
+            aois={'infer': {'percentage': 1.0, 'position': 1}}
         )
     elif config.aoi_config == "generate":
         aois_config = AOIGeneratorConfig(
