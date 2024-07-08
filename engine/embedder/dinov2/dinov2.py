@@ -114,8 +114,6 @@ class DINOv2Inference:
                 output = output['x_norm_clstoken']
                 output_pp = output
 
-            output_pp = output_pp.cpu().detach().numpy()
-
             return output_pp, pads
 
     def infer_on_segmentation_dataset(self,
