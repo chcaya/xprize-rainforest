@@ -53,17 +53,17 @@ def train(model: XPrizeTreeEmbedder or XPrizeTreeEmbedder2 or XPrizeTreeEmbedder
         model = nn.DataParallel(model)
     model.to(device)
 
-    # model.eval()
-    # with torch.no_grad():
-    #     validate(
-    #         model=model,
-    #         train_loader=valid_train_dataloader,
-    #         valid_dataloaders=valid_dataloaders,
-    #         distance=distance,
-    #         overall_step=0,
-    #         writer=writer,
-    #         valid_knn_k=valid_knn_k
-    #     )
+    model.eval()
+    with torch.no_grad():
+        validate(
+            model=model,
+            train_loader=valid_train_dataloader,
+            valid_dataloaders=valid_dataloaders,
+            distance=distance,
+            overall_step=0,
+            writer=writer,
+            valid_knn_k=valid_knn_k
+        )
 
     scaler = torch.cuda.amp.GradScaler()  # Initialize the GradScaler for mixed precision training
 
@@ -316,6 +316,7 @@ if __name__ == '__main__':
         source_data_root = Path(args.data_root)
 
     use_datasets = yaml_config['use_datasets']
+    freeze_resnet_backbone = yaml_config['freeze_resnet_backbone']
     max_resampling_times_train = yaml_config['max_resampling_times_train']
     max_resampling_times_valid_train = yaml_config['max_resampling_times_valid_train']
     valid_knn_k = yaml_config['valid_knn_k']
@@ -531,6 +532,10 @@ if __name__ == '__main__':
             model = model.from_checkpoint(start_from_checkpoint)
         else:
             raise ValueError(f'Unknown model type: {model.__class__}')
+
+    if freeze_resnet_backbone:
+        for param in model.backbone.parameters():
+            param.requires_grad = False
 
     if distance == 'cosine':
         distance_f = distances.CosineSimilarity()
