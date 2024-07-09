@@ -149,10 +149,10 @@ def tilerize_brazil_trees_additional_data(output_folder: Path, ground_resolution
     ]
 
     output_suffixes = [
-        'from_detector',
-        'from_detector',
-        'from_detector',
-        'from_detector',
+        'from_detector_additional_data',
+        'from_detector_additional_data',
+        'from_detector_additional_data',
+        'from_detector_additional_data',
     ]
 
     for label, raster, output_suffix in zip(labels, rasters, output_suffixes):
