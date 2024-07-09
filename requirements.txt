@@ -1,6 +1,6 @@
 datasketches==5.0.2
 einops==0.7.0
-geopandas==0.13.2
+geopandas==1.0.1
 geodataset @ git+ssh://git@github.com/hugobaudchon/geodataset.git@hugo
 laspy==2.5.3
 numpy>=1.25.0
