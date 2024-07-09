@@ -32,6 +32,9 @@ class PipelineXPrize:
         pipeline_classifier = PipelineClassifier(pipeline_classifier_config=pipeline_classifier_config)
         classifier_geopackage, classifier_geopackage_path = pipeline_classifier.run()
 
+        classifier_geopackage['polygon_id'] = range(len(classifier_geopackage))
+        classifier_geopackage['Shape_Area'] = classifier_geopackage.area    # for Vincent's pipeline
+
         print(f"\nRunning the biomass estimator...")
         biomass_estimator = BrazilRainforestBiomassEstimator()
         classifier_geopackage = biomass_estimator.estimate_gdf(classifier_geopackage)

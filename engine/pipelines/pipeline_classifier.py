@@ -98,8 +98,6 @@ class PipelineClassifier(BaseRasterPipeline):
         self.classifier_output_folder.mkdir(parents=True, exist_ok=True)
         output_path = self.classifier_output_folder / geopackage_name
 
-        gdf['polygon_id'] = range(len(gdf))
-
         gdf.to_file(output_path, driver='GPKG')
         print(f"Successfully saved the embeddings and classification predictions at {output_path}.")
 
