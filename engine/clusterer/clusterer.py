@@ -15,23 +15,25 @@ class Clusterer:
     def __init__(self,
                  embeddings_df: pd.DataFrame,
                  embeddings_column_name: str,
+                 scale_embeddings: bool,
                  metric: str,
-                 reduce_algo_name1: str,
-                 reduce_algo_name2: str,
+                 reduce_algo_name1: str or None,
+                 reduce_algo_name2: str or None,
                  visualize_algo_name: str,
                  use_reduced1_for_visualization: bool,
                  tsne_perplexity: int,
                  umap_n_neighbors: int,
                  umap_min_dist: float,
                  min_cluster_size: int,
-                 n_components1: int,
-                 n_components2: int,
+                 n_components1: int or None,
+                 n_components2: int or None,
                  output_root_dir: str,
                  n_cpus: int = 10):
 
         self.embeddings_df = embeddings_df
         self.embeddings_column_name = embeddings_column_name
 
+        self.scale_embeddings = scale_embeddings
         self.metric = metric
         self.reduce_algo_name1 = reduce_algo_name1
         self.reduce_algo_name2 = reduce_algo_name2
@@ -62,8 +64,9 @@ class Clusterer:
 
         embeddings = np.array(self.embeddings_df[self.embeddings_column_name].to_list())
 
-        scaler = StandardScaler()
-        embeddings = scaler.fit_transform(embeddings)
+        if self.scale_embeddings:
+            scaler = StandardScaler()
+            embeddings = scaler.fit_transform(embeddings)
 
         if self.reduce_algo_1 is not None and self.reduce_algo_2 is not None:
             self.reduced_embeddings1 = self.reduce_algo_1.fit_transform(embeddings)
