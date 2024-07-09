@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from typing import List, Tuple
+from warnings import warn
 
 import albumentations
 import numpy as np
@@ -128,6 +129,8 @@ class ContrastiveDataset:
                 new_min=self.min_margin,
                 new_max=self.max_margin
             )
+        else:
+            warn('No taxa distances provided. Using default distance of 1 for all negative pairs.', UserWarning)
 
         self.categories_names, self.categories_names_to_idx, self.categories_dists = self._get_categories_distances()
         self.all_samples_labels, self.all_samples_families, self.all_samples_dataset_indices, self.samples_indices_per_label = self._get_all_samples()
@@ -293,7 +296,7 @@ class ContrastiveDataset:
         family = self.all_samples_families[real_idx]
         family_id = self.categories_names_to_idx[family]
         tile = self.datasets[dataset_key][dataset_idx]
-        month, day = tile['month'], tile['day']
+        month, day = int(tile['month']), int(tile['day'])
 
         with rasterio.open(tile['path']) as tile_file:
             data = tile_file.read([1, 2, 3])
@@ -363,7 +366,7 @@ class ContrastiveInferDataset(BaseContrastiveLabeledCocoDataset):
 
     def __getitem__(self, idx):
         tile = self.tiles[idx]
-        month, day = tile['month'], tile['day']
+        month, day = int(tile['month']), int(tile['day'])
 
         with rasterio.open(tile['path']) as tile_file:
             data = tile_file.read([1, 2, 3])
