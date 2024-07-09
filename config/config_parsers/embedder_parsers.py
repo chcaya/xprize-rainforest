@@ -129,6 +129,8 @@ class ContrastiveInferConfig(EmbedderInferConfig):
     checkpoint_path: str
     mean_std_descriptor: str
     image_size: int
+    backbone_name: str
+    final_embedding_size: int
 
     @classmethod
     def from_dict(cls, config: dict):
@@ -140,7 +142,9 @@ class ContrastiveInferConfig(EmbedderInferConfig):
             **parent_config.as_dict(),
             checkpoint_path=contrastive_config['checkpoint_path'],
             mean_std_descriptor=contrastive_config['mean_std_descriptor'],
-            image_size=contrastive_config['image_size']
+            image_size=contrastive_config['image_size'],
+            backbone_name=contrastive_config['backbone_name'],
+            final_embedding_size=contrastive_config['final_embedding_size']
         )
 
     def to_structured_dict(self) -> dict:
@@ -148,7 +152,9 @@ class ContrastiveInferConfig(EmbedderInferConfig):
         config['embedder']['infer']['contrastive'] = {
             'checkpoint_path': self.checkpoint_path,
             'mean_std_descriptor': self.mean_std_descriptor,
-            'image_size': self.image_size
+            'image_size': self.image_size,
+            'backbone_name': self.backbone_name,
+            'final_embedding_size': self.final_embedding_size
         }
 
         return config
@@ -157,25 +163,32 @@ class ContrastiveInferConfig(EmbedderInferConfig):
 @dataclass
 class DINOv2InferConfig(EmbedderInferConfig):
     size: str
+    use_cls_token: bool
+    image_size_center_crop_pad: int
     instance_segmentation: bool
     mean_std_descriptor: str
+
     @classmethod
     def from_dict(cls, config: dict):
         parent_config = EmbedderInferConfig.from_dict(config)
         embedder_infer_config = config['embedder']['infer']
-        dino_v2_config = embedder_infer_config['dino_v2']
+        dino_v2_config = embedder_infer_config['dinov2']
 
         return cls(
             **parent_config.as_dict(),
             size=dino_v2_config['size'],
+            use_cls_token=dino_v2_config['use_cls_token'],
+            image_size_center_crop_pad=dino_v2_config['image_size_center_crop_pad'],
             instance_segmentation=dino_v2_config['instance_segmentation'],
             mean_std_descriptor=dino_v2_config['mean_std_descriptor']
         )
 
     def to_structured_dict(self):
         config = super().to_structured_dict()
-        config['embedder']['infer']['dino_v2'] = {
+        config['embedder']['infer']['dinov2'] = {
             'size': self.size,
+            'use_cls_token': self.use_cls_token,
+            'image_size_center_crop_pad': self.image_size_center_crop_pad,
             'instance_segmentation': self.instance_segmentation,
             'mean_std_descriptor': self.mean_std_descriptor
         }

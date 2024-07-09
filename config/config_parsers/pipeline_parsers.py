@@ -5,7 +5,7 @@ from config.config_parsers.aggregator_parsers import AggregatorConfig
 from config.config_parsers.base_config_parsers import BaseConfig
 from config.config_parsers.classifier_configs import ClassifierInferConfig
 from config.config_parsers.detector_parsers import DetectorInferConfig
-from config.config_parsers.embedder_parsers import SiameseInferConfig, ContrastiveInferConfig
+from config.config_parsers.embedder_parsers import SiameseInferConfig, ContrastiveInferConfig, DINOv2InferConfig
 from config.config_parsers.segmenter_parsers import SegmenterInferConfig
 from config.config_parsers.tilerizer_parsers import TilerizerConfig, TilerizerNoAoiConfig
 
@@ -151,31 +151,45 @@ class PipelineSegmenterIOConfig(PipelineSegmenterConfig):
 @dataclass
 class PipelineClassifierConfig(BaseConfig):
     classifier_tilerizer_config: TilerizerNoAoiConfig
-    classifier_embedder_config: ContrastiveInferConfig
-    # classifier_infer_config: ClassifierInferConfig
+    classifier_contrastive_embedder_config: ContrastiveInferConfig or None
+    classifier_dinov2_embedder_config: DINOv2InferConfig or None
 
     @classmethod
     def from_dict(cls, config: dict):
         pipeline_classifier_config = config['pipeline_classifier']
 
         classifier_tilerizer_config = TilerizerNoAoiConfig.from_dict(pipeline_classifier_config)
-        classifier_embedder_config = ContrastiveInferConfig.from_dict(pipeline_classifier_config)
-        # classifier_infer_config = ClassifierInferConfig.from_dict(pipeline_classifier_config)
+        embedder_infer_config = pipeline_classifier_config['embedder']['infer']
+        if 'contrastive' in embedder_infer_config:
+            classifier_contrastive_embedder_config = ContrastiveInferConfig.from_dict(pipeline_classifier_config)
+        else:
+            classifier_contrastive_embedder_config = None
+
+        if 'dinov2' in embedder_infer_config:
+            classifier_dinov2_embedder_config = DINOv2InferConfig.from_dict(pipeline_classifier_config)
+        else:
+            classifier_dinov2_embedder_config = None
 
         return cls(
             classifier_tilerizer_config=classifier_tilerizer_config,
-            classifier_embedder_config=classifier_embedder_config,
-            # classifier_infer_config=classifier_infer_config,
+            classifier_contrastive_embedder_config=classifier_contrastive_embedder_config,
+            classifier_dinov2_embedder_config=classifier_dinov2_embedder_config,
         )
 
     def to_structured_dict(self):
         config = {
             'pipeline_classifier': {
                 'tilerizer': self.classifier_tilerizer_config.to_structured_dict()['tilerizer'],
-                'embedder': self.classifier_embedder_config.to_structured_dict()['embedder'],
-                # 'classifier': self.classifier_infer_config.to_structured_dict()['classifier']
+                'embedder': {
+                    'infer': {}
+                }
             }
         }
+
+        if self.classifier_contrastive_embedder_config is not None:
+            config['pipeline_classifier']['embedder']['infer']['contrastive'] = self.classifier_contrastive_embedder_config.to_structured_dict()['embedder']['infer']['contrastive']
+        if self.classifier_dinov2_embedder_config is not None:
+            config['pipeline_classifier']['embedder']['infer']['dinov2'] = self.classifier_dinov2_embedder_config.to_structured_dict()['embedder']['infer']['dinov2']
 
         return config
 

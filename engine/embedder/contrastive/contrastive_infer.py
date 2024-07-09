@@ -18,17 +18,15 @@ from engine.embedder.contrastive.contrastive_utils import ConditionalAutocast, F
     IMAGENET_MEAN, IMAGENET_STD, contrastive_infer_collate_fn
 
 
-def contrastive_classifier_embedder_infer(data_roots: str or List[str],
+def contrastive_classifier_embedder_infer(backbone_name: str,
+                                          final_embedding_size: int,
+                                          data_roots: str or List[str],
                                           fold: str,
                                           day_month_year: Tuple[int, int, int],
                                           image_size: int,
                                           mean_std_descriptor: str,
                                           contrastive_checkpoint: str,
-                                          batch_size: int,
-                                          product_name: str,
-                                          ground_resolution: float,
-                                          scale_factor: float,
-                                          output_folder: Path):
+                                          batch_size: int):
 
     if mean_std_descriptor == 'forest_qpeb':
         mean = FOREST_QPEB_MEAN
@@ -62,8 +60,13 @@ def contrastive_classifier_embedder_infer(data_roots: str or List[str],
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f'Loading model from {contrastive_checkpoint}')
-    raise Exception('change model here.')
-    model = XPrizeTreeEmbedder2NoDate.from_checkpoint(contrastive_checkpoint).to(device)
+    model = XPrizeTreeEmbedder(
+        resnet_model=backbone_name,
+        final_embedding_size=final_embedding_size,
+        dropout=0
+    )
+    model.load_state_dict(torch.load(contrastive_checkpoint))
+    model.to(device)
     model.eval()
 
     embeddings, predicted_families, predicted_families_scores = infer_model_without_labels(
@@ -91,33 +94,22 @@ def contrastive_classifier_embedder_infer(data_roots: str or List[str],
 
     tiles_polygons_gdf = gpd.GeoDataFrame({
         'a_id': [str(x) for x in range(len(polygons))],     # this is just a dummy column so that QGIS doesn't use the 'embeddings' column as base label for the geometries
-        'polygon_id': range(len(polygons)),
         'geometry': polygons,
         'embeddings': embeddings.tolist(),
-        'predicted_family': predicted_families,
-        'predicted_family_scores': predicted_families_scores.tolist(),
         'tile_path': tiles_paths
     })
+
+    if predicted_families_scores:
+        tiles_polygons_gdf['predicted_family'] = predicted_families
+        tiles_polygons_gdf['predicted_family_scores'] = predicted_families_scores.tolist()
 
     tiles_polygons_gdf_crs = tiles_polygons_gdf_to_crs_gdf(tiles_polygons_gdf)
 
     tiles_polygons_gdf_crs['area'] = tiles_polygons_gdf_crs['geometry'].area
 
-    geopackage_name = GeoPackageNameConvention.create_name(
-        product_name=product_name,
-        fold='inferembedderclassifier',
-        ground_resolution=ground_resolution,
-        scale_factor=scale_factor,
-    )
-
     tiles_polygons_gdf_crs['embeddings'] = tiles_polygons_gdf_crs['embeddings'].apply(lambda x: str(x))
 
-    output_folder.mkdir(parents=True, exist_ok=True)
-    output_path = output_folder / geopackage_name
-    tiles_polygons_gdf_crs.to_file(output_path, driver='GPKG')
-    print(f"Successfully saved the embeddings and classification predictions at {output_path}.")
-
-    return tiles_polygons_gdf_crs, output_path
+    return tiles_polygons_gdf_crs
 
 
 def infer_model_without_labels(model, dataloader, device, use_mixed_precision, desc='Infering...', as_numpy=True):
