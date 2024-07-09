@@ -86,6 +86,7 @@ if __name__ == "__main__":
             'brazil_train': train_dataset_brazil
         },
         min_level=min_level,
+        random_crop=False,
         image_size=image_size,
         transform=None,
         normalize=True,
@@ -99,7 +100,7 @@ if __name__ == "__main__":
 
     print(len(dataset))
 
-    model = XPrizeTreeEmbedder2NoDate.from_checkpoint(checkpoint).to(device)
+    model = XPrizeTreeEmbedder.from_checkpoint(checkpoint).to(device)
     # model.load_state_dict(torch.load(checkpoint))
     model.eval()
 
@@ -154,48 +155,6 @@ if __name__ == "__main__":
     tsne = TSNE(n_components=2, random_state=42, metric=metric)
     reduced_embeddings = tsne.fit_transform(shuffled_embeddings)
     top_labels = list(set(shuffled_labels))
-
-    plt.figure(figsize=(27, 12))
-    # eps_list = [0.03, 0.05, 0.08, 0.12, 0.15, 0.2]
-    # eps_list = [1.5, 2, 2.5, 3, 3.5, 4]
-    # min_samples_list = [5, 7, 10, 12, 15, 17, 20, 30, 40]
-    eps_list = [2.2, 2.5, 3, 3.5]
-    min_samples_list = [16, 17, 18]
-    for i, eps in enumerate(eps_list):
-        for j, min_samples in enumerate(min_samples_list):
-            dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-            cluster_labels = dbscan.fit_predict(reduced_embeddings)
-            print(i * len(min_samples_list) + j + 1, f'eps={eps}, min_samples={min_samples}, n_clusters={len(set(cluster_labels))}')
-            plt.subplot(len(eps_list) + 1, len(min_samples_list), i * len(min_samples_list) + j + 1)
-            cmap = plt.get_cmap('jet', n_clusters)
-
-            for k in range(n_clusters):
-                idx = cluster_labels == k
-                plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(k), label=f'Cluster {k}', alpha=0.5)
-
-            plt.colorbar(ticks=range(n_clusters), label='Cluster index', boundaries=np.arange(n_clusters + 1) - 0.5,
-                         spacing='proportional')
-            plt.clim(-0.5, n_clusters - 0.5)
-            plt.title(f't-SNE eps={eps}, min_samples={min_samples}')
-            plt.xlabel('Component 1')
-            plt.ylabel('Component 2')
-            plt.legend(title="Cluster IDs")
-
-    plt.subplot(len(eps_list) + 1, len(min_samples_list), i * len(min_samples_list) + j + 2)
-    cmap = plt.get_cmap('jet', len(top_labels))  # Get a colormap with as many colors as top labels
-
-    for i, label in enumerate(top_labels):
-        idx = shuffled_labels == label
-        plt.scatter(reduced_embeddings[idx, 0], reduced_embeddings[idx, 1], color=cmap(i), label=f'{label}', alpha=0.5)
-
-    plt.colorbar(ticks=range(len(top_labels)), label='Label index', boundaries=np.arange(len(top_labels) + 1) - 0.5,
-                 spacing='proportional')
-    plt.clim(-0.5, len(top_labels) - 0.5)
-    plt.title('t-SNE of Embeddings with True Labels')
-    plt.xlabel('Component 1')
-    plt.ylabel('Component 2')
-    plt.legend(title="True Labels")
-    plt.show()
 
     plt.figure(figsize=(10, 10))
 
