@@ -18,6 +18,10 @@ def collate_fn_segmentation(batch):
                'iscrowd': torch.tensor(np.array(item[1]['iscrowd']), dtype=torch.bool),
                'image_id': torch.tensor(np.array(item[1]['image_id']), dtype=torch.int16)} for item in batch]
 
+    if 'labels_polygons' in batch[0][1]:
+        for i, item in enumerate(batch):
+            labels[i]['labels_polygons'] = item[1]['labels_polygons']
+
     return data, labels
 
 

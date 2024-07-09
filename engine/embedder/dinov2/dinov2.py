@@ -1,14 +1,17 @@
 import itertools
+import json
 import math
 import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as tvf
 from einops import einops
+from geodataset.utils import rle_segmentation_to_mask, mask_to_polygon, tiles_polygons_gdf_to_crs_gdf
 from scipy import sparse
 from skimage.measure import block_reduce
 from tqdm import tqdm
@@ -16,6 +19,7 @@ from tqdm import tqdm
 from geodataset.dataset import SegmentationLabeledRasterCocoDataset
 
 from config.config_parsers.embedder_parsers import DINOv2InferConfig
+from engine.embedder.dinov2.dinov2_dataset import DINOv2SegmentationLabeledRasterCocoDataset
 from engine.embedder.utils import apply_pca_to_images, IMAGENET_MEAN, IMAGENET_STD, FOREST_QPEB_MEAN, FOREST_QPEB_STD
 from engine.utils.utils import collate_fn_segmentation
 
@@ -114,10 +118,10 @@ class DINOv2Inference:
                 output = output['x_norm_clstoken']
                 output_pp = output
 
-            return output_pp, pads
+            return output_pp.cpu().numpy(), pads
 
     def infer_on_segmentation_dataset(self,
-                                      dataset: SegmentationLabeledRasterCocoDataset,
+                                      dataset: DINOv2SegmentationLabeledRasterCocoDataset,
                                       average_non_masked_patches: bool,
                                       batch_size: int):
         data_loader = torch.utils.data.DataLoader(dataset,
@@ -126,8 +130,6 @@ class DINOv2Inference:
                                                   collate_fn=collate_fn_segmentation)
 
         dfs = []
-        embeddings_list = []
-        down_sampled_masks_list = []
         tqdm_dataset = tqdm(data_loader, desc="Inferring DINOv2...")
         for i, x in enumerate(tqdm_dataset):
             images = x[0]
@@ -162,46 +164,47 @@ class DINOv2Inference:
                     embedding = non_zero_patches_mean
 
                 df = pd.DataFrame({
-                    'labels': label['labels'].numpy().tolist(),
-                    'area': label['area'].numpy().tolist(),
-                    'iscrowd': label['iscrowd'].numpy().tolist(),
+                    'labels': label['labels'].cpu().numpy().tolist(),
+                    'geometry': label['labels_polygons'],
+                    'area': label['area'].cpu().numpy().tolist(),
+                    'iscrowd': label['iscrowd'].cpu().numpy().tolist(),
                     'image_id': [int(label['image_id'][0])] * len(label['labels']),
-                    'tiles_paths': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels']),
-                    'embeddings': [embedding],
+                    'tile_path': [dataset.tiles[int(label['image_id'][0])]['path']] * len(label['labels'].cpu().numpy()),
+                    'embeddings': [embedding.flatten().tolist()],
                     'down_sampled_masks': down_sampled_masks.tolist()
                 })
                 dfs.append(df)
 
-        # stacked_embeddings = np.stack(embeddings_list, axis=0)
-
-        # if self.config.use_pca:
-        #     stacked_embeddings = apply_pca_to_images(
-        #         stacked_embeddings,
-        #         pca_model_path=self.config.pca_model_path,
-        #         n_patches=self.config.pca_n_patches,
-        #         n_features=self.config.pca_n_features
-        #     )
-
-        # for df, down_sampled_masks, reduced_embeddings in tqdm(
-        #         zip(dfs, down_sampled_masks_list, stacked_embeddings),
-        #         desc="Computing embeddings for each image masks...",
-        #         total=len(dfs)
-        #         ):                              # TODO this is really slow, should be parallelized
-        #     down_sampled_masks_patches_embeddings = reduced_embeddings * down_sampled_masks[:, :, :, np.newaxis]
-        #     down_sampled_masks_embeddings = np.sum(down_sampled_masks_patches_embeddings, axis=(1, 2))
-        #
-        #     non_zero_mask = down_sampled_masks > 0
-        #     non_zero_count = np.sum(non_zero_mask, axis=(1, 2))
-        #     non_zero_count = np.where(non_zero_count == 0, 1, non_zero_count)
-        #     non_zero_patches_mean = down_sampled_masks_embeddings / non_zero_count[:, np.newaxis]
-        #
-        #     df['embeddings'] = non_zero_patches_mean.tolist()
-        #     df['down_sampled_masks'] = down_sampled_masks.tolist()
-
-        final_df = pd.concat(dfs)
-
-        final_df['embeddings'] = final_df['embeddings'].apply(lambda x: x[0])
-
+        final_gdf = gpd.GeoDataFrame(pd.concat(dfs))
+        final_gdf_crs = tiles_polygons_gdf_to_crs_gdf(final_gdf)
+        final_gdf_crs.set_geometry('geometry')
+        final_gdf_crs['embeddings'] = final_gdf_crs['embeddings'].apply(lambda e: str(e))
         print("Done.")
 
-        return final_df
+        return final_gdf_crs
+
+
+def infer_dinov2(data_roots: str,
+                 image_size_center_crop_pad: int,
+                 size: str,
+                 use_cls_token: bool):
+
+    dataset = DINOv2SegmentationLabeledRasterCocoDataset(
+        root_path=data_roots,
+        fold='infer',
+        image_size_center_crop_pad=image_size_center_crop_pad
+    )
+
+    dinov2 = DINOv2Inference(
+        size=size,
+        normalize=False,
+        instance_segmentation=False
+    )
+
+    embeddings_df = dinov2.infer_on_segmentation_dataset(
+        dataset=dataset,
+        average_non_masked_patches=not use_cls_token,
+        batch_size=1
+    )
+
+    return embeddings_df
