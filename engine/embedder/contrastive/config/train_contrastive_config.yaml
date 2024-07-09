@@ -1,5 +1,6 @@
 source_data_root: /home/hugo/Documents/xprize/data/FINAL_polygon_dataset_1536px_gr0p03
 use_datasets: ['panama', 'quebec', 'equator'] #'quebec', 'equator', 'brazil']  #['quebec', 'panama', 'equator', 'brazil']
+freeze_resnet_backbone: true
 max_resampling_times_train: 50
 max_resampling_times_valid_train: 0
 valid_knn_k: 5
