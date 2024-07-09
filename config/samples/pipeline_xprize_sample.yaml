@@ -1,6 +1,8 @@
 io:
     raster_path: '/media/hugobaudchon/4 TB/SBL_test_run/20240429_sblgeneral_xprize100ha_m3m_rgb.tif'
+    aoi_geopackage_path: null
     output_folder: './output/test/sbl_test_run'
+    day_month_year: [1, 1, 2024]   # useless except for some contrastive model architectures
     coco_n_workers: 5
 
 pipeline_detector:
@@ -8,22 +10,14 @@ pipeline_detector:
 
     tilerizer:
         tile_type: 'tile'
-        tile_size: 1024
-        tile_overlap: 0.5
+        tile_size: 1280
+        use_variable_tile_size: null
+        variable_tile_size_pixel_buffer: null
+        tile_overlap: 0.75
         raster_resolution:
             scale_factor: null
             ground_resolution: 0.05
         ignore_black_white_alpha_tiles_threshold: 0.8
-        area_of_interest: {
-            aoi_config: 'generate',
-            aoi_type: 'band',
-            aois: {
-              'infer': {
-                'percentage': 1.0,
-                'position': 1
-              }
-            }
-        }
 
     detector:
         infer:
@@ -31,17 +25,17 @@ pipeline_detector:
                 checkpoint_state_dict_path: './output/detector_quebec/detector_checkpoint.pt'
             base_params:
                 batch_size: 25
-                box_predictions_per_image: 250
+                box_predictions_per_image: 500
             architecture:
                 architecture_name: 'fasterrcnn'
-                backbone_model_resnet_name: 'resnet50'
+                backbone_model_resnet_name: 'resnet101'
 
     aggregator:
         scores_weights: {'detector_score': 1.0}
-        polygon_type: 'box'
         score_threshold: 0.4
         nms_threshold: 0.7
         nms_algorithm: 'iou'
+        polygon_type: 'box'
 
 pipeline_segmenter:
     save_segmenter_intermediate_output: false
@@ -49,26 +43,18 @@ pipeline_segmenter:
     tilerizer:
         tile_type: 'tile'
         tile_size: 1024
-        tile_overlap: 0.5
+        use_variable_tile_size: null
+        variable_tile_size_pixel_buffer: null
+        tile_overlap: 0.6
         raster_resolution:
             scale_factor: null
-            ground_resolution: 0.05
+            ground_resolution: 0.07
         ignore_black_white_alpha_tiles_threshold: 0.8
-        area_of_interest: {
-            aoi_config: 'generate',
-            aoi_type: 'band',
-            aois: {
-              'infer': {
-                'percentage': 1.0,
-                'position': 1
-              }
-            }
-        }
 
     segmenter:
         infer:
-            model_type: 'vit_l'
-            checkpoint_path: 'Data/models/sam/sam_vit_l_0b3195.pth'
+            model_type: 'vit_b'
+            checkpoint_path: 'Data/models/sam/sam_vit_b_01ec64.pth'
             simplify_tolerance: 1.0
             box_padding_percentage: 0.00
             n_postprocess_workers: 16
@@ -85,36 +71,27 @@ pipeline_segmenter:
 pipeline_classifier:
     tilerizer:
         tile_type: 'polygon'
-        tile_size: 1024
+        tile_size: 2048  # this is just the max allowed when use_variable_tile_size = True
+        use_variable_tile_size: true
+        variable_tile_size_pixel_buffer: 10
         tile_overlap: null
         raster_resolution:
             scale_factor: null
-            ground_resolution: 0.05
+            ground_resolution: 0.03
         ignore_black_white_alpha_tiles_threshold: null
-        area_of_interest: {
-            aoi_config: 'generate',
-            aoi_type: 'band',
-            aois: {
-              'infer': {
-                'percentage': 1.0,
-                'position': 1
-              }
-            }
-        }
 
     embedder:
-        infer:
+        infer:  # can set either 'contrastive' or 'dinov2', or both if both embedders are needed
             batch_size: 16
-            siamese:
-                checkpoint_path: 'models/siamese_classifier/checkpoint_0_20000.pth'
-                architecture:
-                    architecture_name: 'siamese'
-                    backbone_model_resnet_name: 'resnet50'
-                    final_embedding_size: 1024
-
-    classifier:
-        infer:
-            scaler_checkpoint_path: 'models/siamese_classifier/scaler.joblib'
-            classifier_checkpoint_path: 'models/siamese_classifier/svc.joblib'
-            architecture:
-                architecture_name: 'svm'
+            contrastive:
+                backbone_name: 'resnet50'
+                mean_std_descriptor: 'forest_qpeb'
+                image_size: 224
+                final_embedding_size: 768
+                checkpoint_path: 'path/to/contrastive_resnet50_224_768_64_genus_1720407357/checkpoint_15_63728.pth'
+            dinov2:
+                size: 'base'
+                use_cls_token: False
+                image_size_center_crop_pad: 224
+                instance_segmentation: False
+                mean_std_descriptor: 'imagenet'
