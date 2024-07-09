@@ -133,13 +133,18 @@ def infer_model_without_labels(model, dataloader, device, use_mixed_precision, d
 
         all_embeddings = torch.cat((all_embeddings, embeddings.detach().cpu()), dim=0)
         all_predicted_families.extend(predicted_families)
-        all_predicted_families_scores = torch.cat(
-            (all_predicted_families_scores, predicted_families_scores.detach().cpu()), dim=0)
+
+        if predicted_families_scores is not None:
+            all_predicted_families_scores = torch.cat(
+                (all_predicted_families_scores, predicted_families_scores.detach().cpu()), dim=0)
+        else:
+            all_predicted_families_scores = None
 
     if as_numpy:
         all_embeddings = all_embeddings.numpy()
         all_predicted_families = np.array(all_predicted_families)
-        all_predicted_families_scores = all_predicted_families_scores.numpy()
+        if all_predicted_families_scores is not None:
+            all_predicted_families_scores = all_predicted_families_scores.numpy()
 
     return all_embeddings, all_predicted_families, all_predicted_families_scores
 
