@@ -73,7 +73,7 @@ class Clusterer:
             self.reduced_embeddings = self.reduce_algo_2.fit_transform(self.reduced_embeddings1)
         elif self.reduce_algo_1 is not None:
             self.reduced_embeddings1 = self.reduce_algo_1.fit_transform(embeddings)
-            self.reduced_embeddings = embeddings
+            self.reduced_embeddings = self.reduced_embeddings1
         else:
             self.reduced_embeddings1 = embeddings
             self.reduced_embeddings = embeddings
@@ -86,7 +86,7 @@ class Clusterer:
     def get_reduce_algo(self, reduce_algo_name: str, n_components: int):
         if reduce_algo_name == 'tsne':
             reduce_algo = TSNE(n_components=n_components, random_state=42,
-                                    metric=self.metric, perplexity=self.tsne_perplexity)
+                               metric=self.metric, perplexity=self.tsne_perplexity)
         elif reduce_algo_name == 'umap':
             reduce_algo = umap.UMAP(n_components=n_components, n_neighbors=self.umap_n_neighbors,
                                     min_dist=self.umap_min_dist, metric=self.metric, random_state=42)
