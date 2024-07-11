@@ -38,7 +38,7 @@ def plot_embeddings(embeddings, labels):
     plt.title('t-SNE visualization of embeddings by Family and Genus')
     plt.xlabel('Component 1')
     plt.ylabel('Component 2')
-    plt.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
+    # plt.legend(title='Category', bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True)
     plt.show()
 
@@ -46,7 +46,7 @@ def visualize_clusters(labeled_features, unlabeled_features, labeled_labels, new
     # Reduce dimensionality for visualization
     all_features = np.concatenate([labeled_features, unlabeled_features], axis=0)
     all_labels = np.concatenate([labeled_labels, new_labels], axis=0)
-    reduced_features =  TSNE(n_components=2).fit_transform(all_features)
+    reduced_features = TSNE(n_components=2).fit_transform(all_features)
 
     # Ensure labels are numpy arrays
     labeled_labels = np.array(labeled_labels)
@@ -79,24 +79,27 @@ def visualize_clusters(labeled_features, unlabeled_features, labeled_labels, new
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.show()
 
-def visualize_dbscan_output(features, all_labels):
+def visualize_dbscan_output(features, all_labels, title_suffix = ""):
         # Reduce dimensionality for visualization
-        reduced_features = TSNE(n_components=2).fit_transform(features)
+        features = TSNE(n_components=2).fit_transform(features)
 
+        sample_indices = np.random.choice(len(features), 5000, replace=False)
+        features_sampled = features[sample_indices]
+        all_labels_sampled = all_labels[sample_indices]
         # Plot the clusters
         plt.figure(figsize=(10, 7))
-        unique_labels = np.unique(all_labels)
+        unique_labels = np.unique(all_labels_sampled)
         for label in unique_labels:
             if label == -1:
                 # Noise
-                plt.scatter(reduced_features[all_labels == label, 0], reduced_features[all_labels == label, 1], s=50,
+                plt.scatter(features_sampled[all_labels_sampled == label, 0], features_sampled[all_labels_sampled == label, 1], s=50,
                             c='k', marker='x', label='Noise')
             else:
-                plt.scatter(reduced_features[all_labels == label, 0], reduced_features[all_labels == label, 1], s=50,
+                plt.scatter(features_sampled[all_labels_sampled == label, 0], features_sampled[all_labels_sampled == label, 1], s=50,
                             label=f'Cluster {label}')
 
-        plt.title('DBSCAN Clusters')
+        plt.title(f'DBSCAN Clusters {title_suffix}')
         plt.xlabel('Component 1')
         plt.ylabel('Component 2')
-        plt.legend()
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.show()

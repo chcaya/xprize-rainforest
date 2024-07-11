@@ -92,8 +92,8 @@ class BioClipActiveLearner:
         return aligned_labels, all_sampled_idx
 
 def main():
-    config = load_config(config_path='config.yaml')
-    data_loader = data_loader_init_main('config.yaml')
+    config = load_config(config_path='configs/config.yaml')
+    data_loader = data_loader_init_main('configs/config.yaml')
 
     model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
     active_learner = BioClipActiveLearner(model)
@@ -101,6 +101,7 @@ def main():
     # Extract features using the model
     all_embeddings, all_labels = [], []
     for batch_idx, (image_tensors, batch_labels) in enumerate(data_loader):
+        print (f'batch: {batch_idx}/{len(data_loader)}')
         batch_embeddings = active_learner.extract_features(image_tensors)
         all_embeddings.append(batch_embeddings)
         all_labels.extend(batch_labels)
@@ -109,7 +110,9 @@ def main():
     all_labels = np.array(all_labels)
 
     # reduce dims for dbscan
+    print ("reducing dims")
     reduced_embeddings = active_learner.reduce_dimensions(all_embeddings)
+    print ("running dbscan")
     dbscan_labels = active_learner.cluster_data(reduced_embeddings)
 
     if config['active_learner']['visualize_dbscan']:

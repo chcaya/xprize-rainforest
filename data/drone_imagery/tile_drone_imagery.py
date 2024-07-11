@@ -1,5 +1,22 @@
-from PIL import Image
+import glob
+import os.path
 
+from PIL import Image
+from pathlib import Path
+
+def is_non_invisible_pixel(pixel, threshold=0):
+    """
+    Checks if a pixel is non-invisible based on a threshold.
+    """
+    return pixel[3] > threshold  # Assuming the image has an alpha channel
+
+def get_non_invisible_percentage(tile):
+    """
+    Calculates the percentage of non-invisible pixels in a tile.
+    """
+    pixels = tile.getdata()
+    non_invisible_pixels = sum(1 for pixel in pixels if is_non_invisible_pixel(pixel))
+    return (non_invisible_pixels / len(pixels)) * 100
 
 def compute_optimal_tile_size(image_path, min_size=300, max_size=500):
     """
@@ -22,7 +39,7 @@ def compute_optimal_tile_size(image_path, min_size=300, max_size=500):
     return optimal_tile_size
 
 
-def tile_image(image_path, tile_size):
+def tile_image(image_path, tile_size, non_invisible_threshold=50):
     """
     Tiles an image using the specified tile size.
     """
@@ -39,23 +56,37 @@ def tile_image(image_path, tile_size):
             right = left + tile_size
             bottom = upper + tile_size
             tile = img.crop((left, upper, right, bottom))
-            tiles.append(tile)
+            if i not in [0, num_tiles_vertical-1] and j not in [0, num_tiles_vertical-1]:
+                tiles.append(tile)
+            # non_invisible_percentage = get_non_invisible_percentage(tile)
+            # if non_invisible_percentage >= non_invisible_threshold:
+            #     tiles.append(tile)
 
     return tiles
 
 
-def save_tiles(tiles, tile_size):
+def save_tiles(tiles, tile_size, file_prefix, output_dir):
     """
     Saves each tile to disk with an appropriate filename.
     """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
     for idx, tile in enumerate(tiles):
-        tile.save(f'tile_{idx + 1}_{tile_size}x{tile_size}.png')
+        tile.save(output_dir / f'{file_prefix}_tile_{idx + 1}_{tile_size}x{tile_size}.png')
 
 
-# Example usage
-image_path = 'path_to_your_image.jpg'  # Replace with your image path
-optimal_tile_size = compute_optimal_tile_size(image_path)
-tiles = tile_image(image_path, optimal_tile_size)
-save_tiles(tiles, optimal_tile_size)
+if __name__ == "__main__":
+    dir_path = Path('/Users/daoud/PycharmAssets/xprize/competition_data/')
+    # todo: convert to args
+    drone_photos_path = str(f"20240709_xprize100ha_zoom_m3e/DJI_202407090930_013_20240709xprizefinals-zoomedpictures3")
+    set_id = drone_photos_path[-1]
+    image_glob_search_string = str(dir_path / drone_photos_path) + '/*.JPG'
+    images_paths = glob.glob(image_glob_search_string)
+    tile_size = 300
 
-print(f"Optimal tile size: {optimal_tile_size}, Number of tiles: {len(tiles)}")
+    for image_path in images_paths:
+        file_name = image_path.split('/')[-1].split('.')[0]
+        tiles = tile_image(image_path, tile_size, non_invisible_threshold=75)
+        save_tiles(tiles, tile_size, file_prefix = file_name, output_dir= dir_path / f"preprocessed/set_{set_id}/{tile_size}" / f"{file_name}_cropped/")
+
+
