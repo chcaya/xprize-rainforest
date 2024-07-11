@@ -56,9 +56,11 @@ def tile_image(image_path, tile_size, non_invisible_threshold=50):
             right = left + tile_size
             bottom = upper + tile_size
             tile = img.crop((left, upper, right, bottom))
-            non_invisible_percentage = get_non_invisible_percentage(tile)
-            if non_invisible_percentage >= non_invisible_threshold:
+            if i not in [0, num_tiles_vertical-1] and j not in [0, num_tiles_vertical-1]:
                 tiles.append(tile)
+            # non_invisible_percentage = get_non_invisible_percentage(tile)
+            # if non_invisible_percentage >= non_invisible_threshold:
+            #     tiles.append(tile)
 
     return tiles
 
@@ -74,16 +76,17 @@ def save_tiles(tiles, tile_size, file_prefix, output_dir):
 
 
 if __name__ == "__main__":
-    dir_path = Path('/Users/daoud/PycharmAssets/xprize/')
+    dir_path = Path('/Users/daoud/PycharmAssets/xprize/competition_data/')
     # todo: convert to args
-    drone_photos_path = str(f"dji/3cm/type3")
-    image_glob_search_string = str(dir_path / drone_photos_path) + '/*'
+    drone_photos_path = str(f"20240709_xprize100ha_zoom_m3e/DJI_202407090930_013_20240709xprizefinals-zoomedpictures3")
+    set_id = drone_photos_path[-1]
+    image_glob_search_string = str(dir_path / drone_photos_path) + '/*.JPG'
     images_paths = glob.glob(image_glob_search_string)
-    tile_size = 80
+    tile_size = 300
 
     for image_path in images_paths:
         file_name = image_path.split('/')[-1].split('.')[0]
-        tiles = tile_image(image_path, tile_size, non_invisible_threshold=60)
-        save_tiles(tiles, tile_size, file_prefix = file_name, output_dir= dir_path / drone_photos_path / f"{file_name}_cropped/")
+        tiles = tile_image(image_path, tile_size, non_invisible_threshold=75)
+        save_tiles(tiles, tile_size, file_prefix = file_name, output_dir= dir_path / f"preprocessed/set_{set_id}/{tile_size}" / f"{file_name}_cropped/")
 
 

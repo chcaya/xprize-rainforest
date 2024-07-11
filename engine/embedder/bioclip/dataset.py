@@ -23,16 +23,25 @@ class BioClipDataset(Dataset):
             file_name = file_name.split('_tile')[0] + '.JPG'
         search_row = self.taxonomy_data[self.taxonomy_data['fileName'] == file_name]
         search_row = search_row.fillna(-1)
-        return int(search_row.iloc[0][key])
+        try:
+            file_name = int(search_row.iloc[0][key])
+            return file_name
+
+        except Exception as e:
+            file_name = "-1"
+
+        return file_name
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
         image_path = self.image_paths[idx]
+        folder_name = image_path.split('/')[-2]
+
         image = Image.open(image_path).convert("RGB")
         image = self.preprocess(image).unsqueeze(0)
 
         family_key = self.get_taxon_key_from_df(Path(image_path).name, key='familyKey')
         genus_key = self.get_taxon_key_from_df(Path(image_path).name, key='genusKey')
         label = f'{family_key}_{genus_key}'
-        return image, label
+        return image, label, folder_name
 
 

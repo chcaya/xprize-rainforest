@@ -1,5 +1,7 @@
 import argparse
 from pathlib import Path
+
+import joblib
 import numpy as np
 import yaml
 import torch
@@ -18,24 +20,28 @@ from engine.embedder.bioclip.data_init import data_loader_init_main
 def main(config_path, visualize_embeddings, num_folders, downstream):
     config = load_config(config_path)
 
-    bioclip_model = BioCLIPModel(config['model_name'], config['pretrained_path'])
+    bioclip_model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
     trainer = DownstreamModelTrainer(config)
     data_loader = data_loader_init_main('config.yaml')
 
 
     all_embeddings, all_labels = [], []
-    for images, labels in data_loader:
+    for batch_idx, (images, labels) in enumerate(data_loader):
+        print (f'{batch_idx}/{len(data_loader)}')
         embeddings = bioclip_model.generate_embeddings(images)
         all_embeddings.append(embeddings)
         all_labels.extend(labels)
 
     all_embeddings = torch.cat(all_embeddings)
-
+    torch.save(all_embeddings, 'archive/train_embeddings.pt')
     if visualize_embeddings:
         plot_embeddings(all_embeddings.numpy(), all_labels)
 
     X_train, X_test, y_train, y_test, label_encoder = trainer.preprocess_data(
-        all_embeddings.numpy(), np.array(all_labels), test_size=config['test_size'], random_state=config['random_state'])
+        all_embeddings.numpy(), np.array(all_labels), test_size=config['training']['test_size'], random_state=config['training']['random_state'])
+
+    joblib.dump(label_encoder, 'archive/label_encoder.pkl')
+
 
     if downstream == 'knn':
         model, classifier_preds, accuracy, report, cm = trainer.train_knn(X_train, X_test, y_train, y_test)
@@ -48,6 +54,7 @@ def main(config_path, visualize_embeddings, num_folders, downstream):
 
     class_names = label_encoder.inverse_transform(np.unique(y_test))
     trainer.plot_confusion_matrix(cm, class_names)
+
 
 
 if __name__ == "__main__":

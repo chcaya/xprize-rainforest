@@ -10,6 +10,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
+
+import joblib
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -66,7 +69,7 @@ class DownstreamModelTrainer:
         svc = SVC(kernel=self.config.get('kernel', 'linear'))
         return self._train_model(svc, X_train, X_test, y_train, y_test)
 
-    def _train_model(self, model, X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray) -> Tuple:
+    def _train_model(self, model, X_train: np.ndarray, X_test: np.ndarray, y_train: np.ndarray, y_test: np.ndarray, trained_model_fp = "model.pkl") -> Tuple:
         """Train a given model and evaluate it on the test set."""
         try:
             model.fit(X_train, y_train)
@@ -77,6 +80,11 @@ class DownstreamModelTrainer:
             logger.info(f"Overall accuracy: {accuracy}")
             logger.info("Classification report per class:")
             logger.info(class_report)
+
+            # save model
+            logger.info("Saving trained model")
+            joblib.dump(model, trained_model_fp)
+
             return model, y_pred, accuracy, class_report, cm
         except Exception as e:
             logger.error(f"Error in _train_model: {e}")
@@ -87,16 +95,17 @@ class DownstreamModelTrainer:
         X_train: np.ndarray,
         X_test: np.ndarray,
         y_train: np.ndarray,
-        y_test: np.ndarray
+        y_test: np.ndarray,
+        model_checkpoint_fp: str = './downstream_nn.pth',
     ) -> Tuple:
         """Train a simple neural network and return the best model based on validation accuracy."""
         try:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             input_dim = X_train.shape[1]
             output_dim = len(np.unique(y_train))
-            model = TwoLayerNN(input_dim, self.config['hidden_dim'], output_dim).to(device)
+            model = TwoLayerNN(input_dim, self.config['training']['hidden_dim'], output_dim).to(device)
             criterion = nn.CrossEntropyLoss()
-            optimizer = optim.Adam(model.parameters(), lr=self.config['learning_rate'])
+            optimizer = optim.Adam(model.parameters(), lr=self.config['training']['learning_rate'])
 
             X_train_tensor, X_test_tensor, y_train_tensor, y_test_tensor = self.convert_to_tensor(X_train, X_test, y_train, y_test)
             X_train_tensor, y_train_tensor = X_train_tensor.to(device), y_train_tensor.to(device)
@@ -105,7 +114,7 @@ class DownstreamModelTrainer:
             best_accuracy = 0
             best_model = None
 
-            for epoch in range(self.config['num_epochs']):
+            for epoch in range(self.config['training']['num_epochs']):
                 model.train()
                 optimizer.zero_grad()
                 outputs = model(X_train_tensor)
@@ -120,7 +129,7 @@ class DownstreamModelTrainer:
                         y_pred_nn = torch.argmax(y_pred_nn, axis=1).cpu().numpy()
                         test_loss = criterion(model(X_test_tensor), y_test_tensor).item()
                         accuracy = accuracy_score(y_test, y_pred_nn)
-                        logger.info(f"Epoch {epoch + 1}/{self.config['num_epochs']}, Test Loss: {test_loss}, Test Accuracy: {accuracy}")
+                        logger.info(f"Epoch {epoch + 1}/{self.config['training']['num_epochs']}, Test Loss: {test_loss}, Test Accuracy: {accuracy}")
 
                         if accuracy > best_accuracy:
                             best_accuracy = accuracy
@@ -137,6 +146,8 @@ class DownstreamModelTrainer:
             logger.info("Best Classification report per class:")
             logger.info(class_report)
 
+            logger.info("Saving downstream NN model")
+            torch.save(model.state_dict(), f=model_checkpoint_fp)
             return model, y_pred_nn, overall_accuracy, class_report, cm_nn
         except Exception as e:
             logger.error(f"Error in train_nn: {e}")

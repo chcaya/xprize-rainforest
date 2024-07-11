@@ -35,7 +35,7 @@ def data_loader_init_main(config_path: str):
     bioclip_model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
     dataset = BioClipDataset(image_paths, taxonomy_data, bioclip_model.preprocess_val)
     data_loader = DataLoader(dataset, batch_size=config['training']['batch_size'],
-                             shuffle=True, num_workers=config['training']['num_workers'])
+                             shuffle=config['data']['shuffle'], num_workers=config['training']['num_workers'])
 
     return data_loader
 
@@ -43,4 +43,4 @@ if __name__ == "__main__":
     data_loader = data_loader_init_main('config.yaml')
     # You can now use the data_loader as needed
     for idx, (image_tensors, labels) in enumerate(data_loader):
-        print (idx, batch)
+        print (idx, image_tensors)
