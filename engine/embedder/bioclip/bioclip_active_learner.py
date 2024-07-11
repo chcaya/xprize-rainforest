@@ -92,8 +92,8 @@ class BioClipActiveLearner:
         return aligned_labels, all_sampled_idx
 
 def main():
-    config = load_config(config_path='config.yaml')
-    data_loader = data_loader_init_main('config.yaml')
+    config = load_config(config_path='configs/config.yaml')
+    data_loader = data_loader_init_main('configs/config.yaml')
 
     model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
     active_learner = BioClipActiveLearner(model)

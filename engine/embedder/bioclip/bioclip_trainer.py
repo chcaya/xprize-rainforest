@@ -22,7 +22,7 @@ def main(config_path, visualize_embeddings, num_folders, downstream):
 
     bioclip_model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
     trainer = DownstreamModelTrainer(config)
-    data_loader = data_loader_init_main('config.yaml')
+    data_loader = data_loader_init_main('configs/config.yaml')
 
 
     all_embeddings, all_labels = [], []
@@ -59,7 +59,7 @@ def main(config_path, visualize_embeddings, num_folders, downstream):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BioCLIP Model Training and Inference")
-    parser.add_argument('--config', type=str, default='config.yaml', help='Path to the configuration file')
+    parser.add_argument('--config', type=str, default='configs/config.yaml', help='Path to the configuration file')
     parser.add_argument('--visualize_embeddings', action='store_true', help='Flag to visualize embeddings')
     parser.add_argument('--num_folders', type=int, help='Number of folders to process (default is all)')
     parser.add_argument('--downstream', type=str, choices=['knn', 'svc', 'nn'], required=True,

@@ -5,7 +5,7 @@ def extract_name(df, column):
     return df
 
 if __name__ == '__main__':
-    results = pd.read_csv('all_top3.csv')
+    results = pd.read_csv('results/all_top3.csv')
     human = pd.read_csv('/Users/daoud/PycharmAssets/xprize/20240709_xprize100ha_zoom_m3e_human_identifications - 20240709xprizefinals-zoomedpict.csv')
     human = extract_name(human, 'fileName')
     results = extract_name(results, column='image')

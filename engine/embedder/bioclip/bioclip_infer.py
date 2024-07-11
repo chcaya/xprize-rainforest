@@ -12,12 +12,12 @@ from bioclip_model import BioCLIPModel
 
 if __name__ == '__main__':
 
-    config = load_config("./config_test.yaml")
+    config = load_config("configs/config_test.yaml")
     confidence_threshold = 0.95
     set_id = config['data']['folder_pattern'].split('/')[-3]
 
     bioclip_model = BioCLIPModel(config['training']['model_name'], config['training']['pretrained_path'])
-    data_loader = data_loader_init_main('./config_test.yaml')
+    data_loader = data_loader_init_main('configs/config_test.yaml')
     downstream_model = TwoLayerNN(512, config['training']['hidden_dim'], 46)
     downstream_model.load_state_dict(torch.load('downstream/preds/downstream_nn.pth'))
     label_encoder = joblib.load('archive/label_encoder.pkl')

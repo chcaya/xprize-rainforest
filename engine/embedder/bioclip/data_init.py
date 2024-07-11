@@ -40,7 +40,7 @@ def data_loader_init_main(config_path: str):
     return data_loader
 
 if __name__ == "__main__":
-    data_loader = data_loader_init_main('config.yaml')
+    data_loader = data_loader_init_main('configs/config.yaml')
     # You can now use the data_loader as needed
     for idx, (image_tensors, labels) in enumerate(data_loader):
         print (idx, image_tensors)

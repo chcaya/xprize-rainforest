@@ -60,7 +60,7 @@ class BioClipInference:
 
     def __call__(self, image_dir: str, save_predictions: bool = False, output_file: str = None):
 
-        data_loader = data_loader_init_main('config.yaml')
+        data_loader = data_loader_init_main('configs/config.yaml')
 
         all_embeddings, file_paths = [], []
 
